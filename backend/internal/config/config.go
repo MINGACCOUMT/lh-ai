@@ -110,3 +110,38 @@ func GetPort() string {
 	}
 	return port
 }
+
+// GetNovelLLMModel 抽分镜用的中转站 chat 模型名。
+func GetNovelLLMModel() string {
+	m := os.Getenv("NOVEL_LLM_MODEL")
+	if m == "" {
+		m = "deepseek-v4-flash"
+	}
+	return m
+}
+
+// GetNovelStoryboardCredits 每章抽分镜扣钻数。
+func GetNovelStoryboardCredits() int {
+	v := os.Getenv("NOVEL_STORYBOARD_CREDITS")
+	if v == "" {
+		return 1
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 1
+	}
+	return n
+}
+
+// GetNovelChapterMaxChars 送 LLM 的章节正文上限。
+func GetNovelChapterMaxChars() int {
+	v := os.Getenv("NOVEL_CHAPTER_MAX_CHARS")
+	if v == "" {
+		return 12000
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return 12000
+	}
+	return n
+}
