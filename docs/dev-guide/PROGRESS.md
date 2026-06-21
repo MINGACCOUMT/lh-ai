@@ -43,7 +43,9 @@
 
 **数据表**：`novels`、`novel_chapters`(+outline/characters/scenes/analysis_status)、`novel_plots`(+storyboard_status)、`novel_shots`(plot_id)。
 
-**关键 bug 修复记录**（过程踩坑）：切章正则空行吞标题、dev_code 死代码、keygen 未加载 JWT_SECRET、OSS 阻止公共访问、chat 静默失败、novel_plots 无 updated_at、shots 唯一键 chapter_id→plot_id、解析 characters/scenes 数组类型。
+**关键 bug 修复记录**（过程踩坑）：切章正则空行吞标题、dev_code 死代码、keygen 未加载 JWT_SECRET、OSS 阻止公共访问、chat 静默失败、novel_plots 无 updated_at、shots 唯一键 chapter_id→plot_id、解析 characters/scenes 数组类型、**GBK/GB18030 自动转码**（大小说非 UTF-8 上传）、**空正文章节过滤**（卷首"第X卷"标题误切为空章节）。
+
+> 注：上传限制 50MB；非 UTF-8(.txt) 自动按 GBK/GB18030 解码；空正文章节（卷首/分节标题）自动滤除并重排序号。
 
 ## 四、待办（按优先级）
 
