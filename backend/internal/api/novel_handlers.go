@@ -58,6 +58,17 @@ func UploadNovel(c *gin.Context) {
 	}
 
 	chapters := novel.ParseChapters(content)
+	// 过滤空正文章节（卷首/分节标题如"第一卷 ..."），重排序号
+	filtered := chapters[:0]
+	for _, ch := range chapters {
+		if strings.TrimSpace(ch.Content) != "" {
+			filtered = append(filtered, ch)
+		}
+	}
+	for i := range filtered {
+		filtered[i].Index = i + 1
+	}
+	chapters = filtered
 	title := strings.TrimSuffix(file.Filename, ".txt")
 	if title == "" {
 		title = "未命名小说"
@@ -357,6 +368,10 @@ func AnalyzeChapterHandler(c *gin.Context) {
 	var n db.Novel
 	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	if strings.TrimSpace(ch.Content) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "本章无正文内容（可能只是卷首/标题），无法解析"})
 		return
 	}
 	if ch.AnalysisStatus == "analyzing" {
