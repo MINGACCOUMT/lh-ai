@@ -7,7 +7,9 @@ export const useNovelStore = defineStore('novel', () => {
   const novels = ref([])
   const currentNovel = ref(null)
   const chapters = ref([])
-  const currentStoryboard = ref(null) // {status, shots, title, content}
+  const chapterTotal = ref(0)
+  const chapterLimit = ref(20)
+  const currentStoryboard = ref(null)
 
   async function loadNovels() {
     const { data } = await api.listNovels({ limit: 50 })
@@ -20,9 +22,17 @@ export const useNovelStore = defineStore('novel', () => {
     return data
   }
   async function openNovel(id) {
-    const { data } = await api.getNovel(id)
+    const { data } = await api.getNovel(id, { limit: chapterLimit.value, offset: 0 })
     currentNovel.value = data.novel
-    chapters.value = data.chapters
+    chapters.value = data.chapters || []
+    chapterTotal.value = data.chapter_total || 0
+    return data
+  }
+  async function loadMoreChapters(id) {
+    const offset = chapters.value.length
+    const { data } = await api.getNovel(id, { limit: chapterLimit.value, offset })
+    chapters.value = chapters.value.concat(data.chapters || [])
+    chapterTotal.value = data.chapter_total || chapterTotal.value
     return data
   }
   async function removeNovel(id) {
@@ -41,7 +51,7 @@ export const useNovelStore = defineStore('novel', () => {
     await api.updateShot(shotId, payload)
   }
   return {
-    novels, currentNovel, chapters, currentStoryboard,
-    loadNovels, uploadNovel, openNovel, removeNovel, loadStoryboard, triggerStoryboard, saveShot,
+    novels, currentNovel, chapters, chapterTotal, chapterLimit, currentStoryboard,
+    loadNovels, uploadNovel, openNovel, loadMoreChapters, removeNovel, loadStoryboard, triggerStoryboard, saveShot,
   }
 })

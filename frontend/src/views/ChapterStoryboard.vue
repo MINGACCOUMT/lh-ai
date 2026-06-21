@@ -29,12 +29,20 @@
           <path d="M5 3v4M3 5h4M6 17v4M4 19h4" />
           <path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
         </svg>
-        {{ t('novel.generateStoryboard') }}
+        {{ generateLabel }}
       </button>
     </div>
 
     <!-- Shots -->
     <div class="shots-scroll">
+      <section v-if="status === 'ready' && store.currentStoryboard?.outline" class="outline-card">
+        <header class="outline-header">
+          <span class="outline-dot"></span>
+          <span class="outline-title">本章大纲</span>
+        </header>
+        <p class="outline-text">{{ store.currentStoryboard.outline }}</p>
+      </section>
+
       <n-spin :show="status === 'extracting' && !shots.length">
         <div class="shots-grid" v-if="shots.length">
           <article v-for="s in shots" :key="s.id" class="shot-card">
@@ -90,6 +98,11 @@ const status = ref('none')
 let timer = null
 
 const shots = computed(() => store.currentStoryboard?.shots || [])
+const generateLabel = computed(() => {
+  if (status.value === 'extracting') return '解析中…'
+  if (status.value === 'ready') return '重新解析'
+  return '解析本章'
+})
 
 onMounted(async () => { await poll() })
 onUnmounted(() => { if (timer) clearTimeout(timer) })
@@ -272,6 +285,43 @@ function statusText(s) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 14px;
+}
+
+.outline-card {
+  background: var(--color-tint-white-02);
+  border: 1px solid rgba(0, 202, 224, 0.28);
+  border-left: 3px solid #00cae0;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px var(--color-tint-black-30);
+}
+.outline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.outline-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00cae0;
+  box-shadow: 0 0 8px rgba(0, 202, 224, 0.6);
+}
+.outline-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #00cae0;
+  letter-spacing: 0.04em;
+}
+.outline-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .shot-card {

@@ -37,20 +37,33 @@
           <div class="chapter-action">
             <button
               class="action-btn"
-              :title="t('novel.storyboard')"
+              :class="{ 'action-btn-ready': ch.storyboard_status === 'ready' }"
               @click.stop="router.push({ name: 'chapter-storyboard', params: { cid: ch.id } })"
             >
-              <svg class="action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M14 5h5v5" />
-                <path d="M10 14L19 5" />
-                <path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" />
+              <svg v-if="ch.storyboard_status === 'ready'" class="action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                <circle cx="12" cy="12" r="3" />
               </svg>
+              <svg v-else class="action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 3v4M3 5h4M6 17v4M4 19h4" />
+                <path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
+              </svg>
+              <span class="action-label">{{ ch.storyboard_status === 'ready' ? '查看分镜' : '解析' }}</span>
             </button>
           </div>
         </article>
       </div>
 
-      <div v-else class="chapter-empty">
+      <div v-if="hasMore" class="load-more-wrap">
+        <button class="load-more-btn" :disabled="loadingMore" @click="onLoadMore">
+          <svg v-if="loadingMore" class="btn-icon spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          {{ loadingMore ? '加载中…' : `加载更多 (剩余 ${remaining})` }}
+        </button>
+      </div>
+
+      <div v-if="!store.chapters.length" class="chapter-empty">
         <NEmpty :description="t('novel.empty')" />
       </div>
     </div>
@@ -58,7 +71,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NEmpty } from 'naive-ui'
@@ -69,7 +82,24 @@ const route = useRoute()
 const router = useRouter()
 const store = useNovelStore()
 
+const loadingMore = ref(false)
+
+const hasMore = computed(() => store.chapters.length < store.chapterTotal)
+const remaining = computed(() => Math.max(0, store.chapterTotal - store.chapters.length))
+
 onMounted(() => store.openNovel(route.params.id))
+
+async function onLoadMore() {
+  if (loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  try {
+    await store.loadMoreChapters(route.params.id)
+  } catch (e) {
+    window.$message?.error('加载更多失败')
+  } finally {
+    loadingMore.value = false
+  }
+}
 
 function statusKey(s) { return ({ none: 'none', extracting: 'extracting', ready: 'ready', failed: 'failed' })[s] || 'none' }
 function statusText(s) { return { none: '未抽取', extracting: '抽取中', ready: '就绪', failed: '失败' }[s] || s }
@@ -252,17 +282,26 @@ function statusText(s) { return { none: '未抽取', extracting: '抽取中', re
 }
 
 .action-btn {
-  width: 28px;
-  height: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-  border-radius: 8px;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-tint-white-12);
+  background: var(--color-tint-white-04);
+  color: var(--color-text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
   transition: all .2s;
+  white-space: nowrap;
+}
+.action-btn.action-btn-ready {
+  border-color: rgba(0, 202, 224, 0.4);
+  background: rgba(0, 202, 224, 0.16);
+  color: #d8fbff;
 }
 .action-icon {
   width: 14px;
@@ -272,10 +311,55 @@ function statusText(s) { return { none: '未抽取', extracting: '抽取中', re
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
+  flex-shrink: 0;
 }
 .action-btn:hover {
   border-color: rgba(0, 202, 224, 0.45);
   background: rgba(0, 202, 224, 0.2);
+  color: #d8fbff;
+}
+
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding-bottom: 8px;
+}
+.load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 202, 224, 0.3);
+  background: rgba(0, 202, 224, 0.1);
+  color: #8cefff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+.load-more-btn:hover:not(:disabled) {
+  background: rgba(0, 202, 224, 0.22);
+  border-color: rgba(0, 202, 224, 0.5);
+  box-shadow: 0 2px 10px rgba(0, 202, 224, 0.15);
+}
+.load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.load-more-btn .btn-icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+}
+.load-more-btn .btn-icon.spin {
+  animation: load-more-spin 0.9s linear infinite;
+}
+@keyframes load-more-spin {
+  to { transform: rotate(360deg); }
 }
 
 .chapter-empty {

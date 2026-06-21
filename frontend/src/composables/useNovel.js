@@ -19,7 +19,7 @@ export function useNovel() {
       return instance.post('/upload', fd, { headers: { ...authHeaders(), 'Content-Type': 'multipart/form-data' }, timeout: 60000 })
     },
     listNovels: (params) => instance.get('', { params }),
-    getNovel: (id) => instance.get(`/${id}`),
+    getNovel: (id, params) => instance.get(`/${id}`, { params }),
     deleteNovel: (id) => instance.delete(`/${id}`),
     triggerStoryboard: (chapterId) => instance.post(`/chapters/${chapterId}/storyboard`),
     getStoryboard: (chapterId) => instance.get(`/chapters/${chapterId}/storyboard`),
