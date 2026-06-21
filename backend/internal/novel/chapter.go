@@ -6,7 +6,9 @@ import (
 )
 
 // chapterTitleRe 匹配行首的章节标题：第一章 / 第123章 / 第二节 / 第一回 ...
-var chapterTitleRe = regexp.MustCompile(`(?m)^[[:space:]]*第[0-9一二三四五六七八九十百千零〇两]+[章节回卷部篇][^.\n]*$`)
+// 注意：用 [ \t]* 而非 [[:space:]]*——后者含 \n，会把标题前的空行换行吃进匹配起点，
+// 导致标题段以 \n 开头、标题解析为空（章节间有空行时复现）。
+var chapterTitleRe = regexp.MustCompile(`(?m)^[ \t]*第[0-9一二三四五六七八九十百千零〇两]+[章节回卷部篇][^.\n]*$`)
 
 // ParsedChapter 切出来的章节。
 type ParsedChapter struct {

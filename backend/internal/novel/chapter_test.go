@@ -48,3 +48,21 @@ func TestParseChapters_Hui(t *testing.T) {
 		t.Fatalf("want 2 (回), got %d", len(cs))
 	}
 }
+
+func TestParseChapters_BlankLinesBetweenChapters(t *testing.T) {
+	// 章节之间有空行（真实小说常见），标题不能被吃成空。
+	raw := "第一章 初遇\n小明遇见了小红。\n\n第二章 重逢\n十年后再次相遇。\n\n第三章 结局\n他们开了一家书店。"
+	cs := ParseChapters(raw)
+	if len(cs) != 3 {
+		t.Fatalf("want 3 chapters, got %d", len(cs))
+	}
+	if cs[0].Title != "第一章 初遇" {
+		t.Errorf("title0=%q", cs[0].Title)
+	}
+	if cs[1].Title != "第二章 重逢" {
+		t.Errorf("title1=%q (want 第二章 重逢) — 空行导致标题被吞？", cs[1].Title)
+	}
+	if cs[2].Title != "第三章 结局" {
+		t.Errorf("title2=%q", cs[2].Title)
+	}
+}
