@@ -10,6 +10,7 @@ export const useNovelStore = defineStore('novel', () => {
   const chapterTotal = ref(0)
   const chapterLimit = ref(20)
   const currentStoryboard = ref(null)
+  const chapterDetail = ref(null)
 
   async function loadNovels() {
     const { data } = await api.listNovels({ limit: 50 })
@@ -47,11 +48,25 @@ export const useNovelStore = defineStore('novel', () => {
   async function triggerStoryboard(chapterId) {
     await api.triggerStoryboard(chapterId)
   }
+  async function openChapter(id) {
+    const { data } = await api.getChapterDetail(id)
+    chapterDetail.value = data
+    return data
+  }
+  async function analyzeChapter(id) {
+    const { data } = await api.analyzeChapter(id)
+    return data
+  }
+  async function storyboardForPlot(plotId) {
+    const { data } = await api.storyboardForPlot(plotId)
+    return data
+  }
   async function saveShot(shotId, payload) {
     await api.updateShot(shotId, payload)
   }
   return {
-    novels, currentNovel, chapters, chapterTotal, chapterLimit, currentStoryboard,
-    loadNovels, uploadNovel, openNovel, loadMoreChapters, removeNovel, loadStoryboard, triggerStoryboard, saveShot,
+    novels, currentNovel, chapters, chapterTotal, chapterLimit, currentStoryboard, chapterDetail,
+    loadNovels, uploadNovel, openNovel, loadMoreChapters, removeNovel, loadStoryboard, triggerStoryboard,
+    openChapter, analyzeChapter, storyboardForPlot, saveShot,
   }
 })

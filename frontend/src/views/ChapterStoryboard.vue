@@ -10,72 +10,154 @@
           <span>{{ t('novel.title') }}</span>
         </button>
         <div class="topbar-title">
-          <span class="topbar-name">{{ store.currentStoryboard?.title || t('novel.storyboard') }}</span>
-          <span v-if="shots.length" class="topbar-status status-badge" :class="`status-${status}`">
-            {{ statusText(status) }}
+          <span class="topbar-name">{{ chapter?.title || '…' }}</span>
+          <span
+            v-if="analysisStatus && analysisStatus !== 'none'"
+            class="status-badge"
+            :class="`status-${analysisStatus}`"
+          >
+            {{ analysisStatusText }}
           </span>
         </div>
       </div>
-      <button
-        class="generate-btn"
-        :class="{ busy: status === 'extracting' }"
-        :disabled="status === 'extracting'"
-        @click="onGenerate"
-      >
-        <svg v-if="status === 'extracting'" class="btn-icon spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-        </svg>
-        <svg v-else class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 3v4M3 5h4M6 17v4M4 19h4" />
-          <path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
-        </svg>
-        {{ generateLabel }}
-      </button>
     </div>
 
-    <!-- Shots -->
-    <div class="shots-scroll">
-      <section v-if="status === 'ready' && store.currentStoryboard?.outline" class="outline-card">
-        <header class="outline-header">
-          <span class="outline-dot"></span>
-          <span class="outline-title">本章大纲</span>
-        </header>
-        <p class="outline-text">{{ store.currentStoryboard.outline }}</p>
-      </section>
+    <!-- Body -->
+    <div class="storyboard-scroll">
+      <n-spin :show="loading && !chapter">
+        <!-- Analyze prompt -->
+        <div v-if="chapter && analysisStatus !== 'ready'" class="analyze-block">
+          <div class="analyze-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 3v4M3 5h4M6 17v4M4 19h4" />
+              <path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
+            </svg>
+          </div>
+          <div class="analyze-info">
+            <p class="analyze-title">{{ analysisStatus === 'failed' ? '解析失败，请重试' : '解析本章' }}</p>
+            <p class="analyze-desc">
+              {{ analysisStatus === 'failed'
+                ? '提取大纲、人物画像与关键场景失败，请重新尝试。'
+                : '提取本章大纲、人物画像与关键场景，用于生成分镜。' }}
+            </p>
+          </div>
+          <button
+            class="generate-btn"
+            :class="{ busy: analysisStatus === 'analyzing' }"
+            :disabled="analysisStatus === 'analyzing'"
+            @click="onAnalyze"
+          >
+            <svg v-if="analysisStatus === 'analyzing'" class="btn-icon spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            <svg v-else class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 3v4M3 5h4M6 17v4M4 19h4" />
+              <path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
+            </svg>
+            {{ analysisStatus === 'analyzing' ? '解析中…' : (analysisStatus === 'failed' ? '重新解析' : '解析本章') }}
+          </button>
+        </div>
 
-      <n-spin :show="status === 'extracting' && !shots.length">
-        <div class="shots-grid" v-if="shots.length">
-          <article v-for="s in shots" :key="s.id" class="shot-card">
-            <header class="shot-header">
-              <span class="shot-index">{{ t('novel.storyboard') }} {{ s.shot_index }}</span>
+        <!-- Analysis cards -->
+        <div v-if="analysisStatus === 'ready'" class="analysis-grid">
+          <section v-if="chapter?.outline" class="info-card">
+            <header class="info-header">
+              <span class="info-dot"></span>
+              <span class="info-title">本章大纲</span>
             </header>
-            <div class="shot-body">
-              <label class="shot-field">
-                <span class="shot-field-label">场景</span>
-                <n-input v-model:value="s.scene" type="textarea" :autosize="{ minRows: 1 }" placeholder="场景" @blur="save(s)" />
-              </label>
-              <label class="shot-field">
-                <span class="shot-field-label">人物</span>
-                <n-input v-model:value="s.characters" placeholder="人物" @blur="save(s)" />
-              </label>
-              <label class="shot-field">
-                <span class="shot-field-label">图片提示词</span>
-                <n-input v-model:value="s.prompt" type="textarea" :autosize="{ minRows: 2 }" placeholder="图片提示词" @blur="save(s)" />
-              </label>
-              <label class="shot-field">
-                <span class="shot-field-label">对白 / 旁白</span>
-                <n-input v-model:value="s.dialogue" type="textarea" :autosize="{ minRows: 1 }" placeholder="对白/旁白" @blur="save(s)" />
-              </label>
-              <label class="shot-field">
-                <span class="shot-field-label">镜头运动</span>
-                <n-input v-model:value="s.camera" placeholder="镜头运动" @blur="save(s)" />
-              </label>
+            <p class="info-text">{{ chapter.outline }}</p>
+          </section>
+          <section v-if="chapter?.characters" class="info-card">
+            <header class="info-header">
+              <span class="info-dot"></span>
+              <span class="info-title">人物画像</span>
+            </header>
+            <p class="info-text">{{ chapter.characters }}</p>
+          </section>
+          <section v-if="chapter?.scenes" class="info-card">
+            <header class="info-header">
+              <span class="info-dot"></span>
+              <span class="info-title">关键场景</span>
+            </header>
+            <p class="info-text">{{ chapter.scenes }}</p>
+          </section>
+        </div>
+
+        <!-- Plots -->
+        <div v-if="analysisStatus === 'ready' && plots.length" class="plot-list">
+          <article v-for="plot in plots" :key="plot.id" class="plot-card">
+            <header class="plot-header">
+              <div class="plot-title-wrap">
+                <span class="plot-index">{{ plot.plot_index }}</span>
+                <span class="plot-title-text">{{ plot.title || '—' }}</span>
+              </div>
+              <div class="plot-actions">
+                <span
+                  v-if="plot.storyboard_status && plot.storyboard_status !== 'none'"
+                  class="status-badge"
+                  :class="`status-${plot.storyboard_status}`"
+                >
+                  {{ storyboardStatusText(plot.storyboard_status) }}
+                </span>
+                <button
+                  v-if="plot.storyboard_status !== 'ready'"
+                  class="generate-btn small"
+                  :class="{ busy: plot.storyboard_status === 'extracting' }"
+                  :disabled="plot.storyboard_status === 'extracting'"
+                  @click="onStoryboard(plot)"
+                >
+                  <svg v-if="plot.storyboard_status === 'extracting'" class="btn-icon spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  <svg v-else class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 3v4M3 5h4M6 17v4M4 19h4" />
+                    <path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
+                  </svg>
+                  {{ plot.storyboard_status === 'extracting' ? '生成中…' : (plot.storyboard_status === 'failed' ? '重新生成' : '生成分镜') }}
+                </button>
+              </div>
+            </header>
+            <p v-if="plot.summary" class="plot-summary">{{ plot.summary }}</p>
+
+            <!-- Shots sub-grid -->
+            <div v-if="plot.storyboard_status === 'ready' && plot.shots?.length" class="shots-grid">
+              <article v-for="s in plot.shots" :key="s.id" class="shot-card">
+                <header class="shot-header">
+                  <span class="shot-index">分镜 {{ s.shot_index }}</span>
+                </header>
+                <div class="shot-body">
+                  <label class="shot-field">
+                    <span class="shot-field-label">场景</span>
+                    <n-input v-model:value="s.scene" type="textarea" :autosize="{ minRows: 1 }" placeholder="场景" @update:value="scheduleSave(s)" />
+                  </label>
+                  <label class="shot-field">
+                    <span class="shot-field-label">人物</span>
+                    <n-input v-model:value="s.characters" placeholder="人物" @update:value="scheduleSave(s)" />
+                  </label>
+                  <label class="shot-field">
+                    <span class="shot-field-label">图片提示词</span>
+                    <n-input v-model:value="s.prompt" type="textarea" :autosize="{ minRows: 2 }" placeholder="图片提示词" @update:value="scheduleSave(s)" />
+                  </label>
+                  <label class="shot-field">
+                    <span class="shot-field-label">对白 / 旁白</span>
+                    <n-input v-model:value="s.dialogue" type="textarea" :autosize="{ minRows: 1 }" placeholder="对白 / 旁白" @update:value="scheduleSave(s)" />
+                  </label>
+                  <label class="shot-field">
+                    <span class="shot-field-label">镜头运动</span>
+                    <n-input v-model:value="s.camera" placeholder="镜头运动" @update:value="scheduleSave(s)" />
+                  </label>
+                </div>
+              </article>
+            </div>
+            <div v-else-if="plot.storyboard_status === 'ready'" class="plot-empty">
+              <NEmpty size="small" description="该情节暂无分镜" />
             </div>
           </article>
         </div>
-        <div v-else-if="status === 'extracting'" class="shots-placeholder">{{ statusText(status) }}…</div>
-        <div v-else class="shots-empty-wrap">
-          <NEmpty :description="t('novel.noStoryboard')" />
+
+        <!-- Empty -->
+        <div v-if="chapter && analysisStatus === 'ready' && !plots.length" class="storyboard-empty-wrap">
+          <NEmpty description="暂无情节" />
         </div>
       </n-spin>
     </div>
@@ -86,7 +168,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NEmpty } from 'naive-ui'
+import { NEmpty, NSpin, NInput } from 'naive-ui'
 import { useNovelStore } from '../stores/novel'
 
 const { t } = useI18n()
@@ -94,51 +176,92 @@ const route = useRoute()
 const router = useRouter()
 const store = useNovelStore()
 
-const status = ref('none')
-let timer = null
+const loading = ref(false)
+let pollTimer = null
+const saveTimers = new Map()
 
-const shots = computed(() => store.currentStoryboard?.shots || [])
-const generateLabel = computed(() => {
-  if (status.value === 'extracting') return '解析中…'
-  if (status.value === 'ready') return '重新解析'
-  return '解析本章'
+const chapter = computed(() => store.chapterDetail?.chapter || null)
+const plots = computed(() => store.chapterDetail?.plots || [])
+const analysisStatus = computed(() => chapter.value?.analysis_status || 'none')
+
+const analysisStatusText = computed(() => statusText(analysisStatus.value))
+
+onMounted(async () => {
+  await refresh()
+  schedulePoll()
+})
+onUnmounted(() => {
+  if (pollTimer) clearTimeout(pollTimer)
+  for (const t of saveTimers.values()) clearTimeout(t)
+  saveTimers.clear()
 })
 
-onMounted(async () => { await poll() })
-onUnmounted(() => { if (timer) clearTimeout(timer) })
-
-async function poll() {
+async function refresh() {
+  loading.value = true
   try {
-    const data = await store.loadStoryboard(route.params.cid)
-    status.value = data.status
-    if (status.value === 'extracting') {
-      timer = setTimeout(poll, 3000)
-    }
-  } catch (e) { window.$message?.error('加载失败') }
-}
-
-async function onGenerate() {
-  try {
-    await store.triggerStoryboard(route.params.cid)
-    status.value = 'extracting'
-    store.currentStoryboard = { ...store.currentStoryboard, shots: [] }
-    timer = setTimeout(poll, 3000)
+    await store.openChapter(route.params.cid)
   } catch (e) {
-    window.$message?.error(e.response?.data?.error || '抽取失败')
+    window.$message?.error('加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
-let saveTimer = null
-function save(s) {
-  clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    store.saveShot(s.id, { scene: s.scene, characters: s.characters, prompt: s.prompt, dialogue: s.dialogue, camera: s.camera })
-      .catch(() => window.$message?.error('保存失败'))
-  }, 400)
+function shouldPoll() {
+  if (analysisStatus.value === 'analyzing') return true
+  if (plots.value.some(p => p.storyboard_status === 'extracting')) return true
+  return false
+}
+
+function schedulePoll() {
+  if (pollTimer) clearTimeout(pollTimer)
+  if (shouldPoll()) {
+    pollTimer = setTimeout(async () => {
+      await refresh()
+      schedulePoll()
+    }, 3000)
+  }
+}
+
+async function onAnalyze() {
+  try {
+    await store.analyzeChapter(route.params.cid)
+    schedulePoll()
+  } catch (e) {
+    window.$message?.error(e.response?.data?.error || '解析失败')
+  }
+}
+
+async function onStoryboard(plot) {
+  try {
+    await store.storyboardForPlot(plot.id)
+    schedulePoll()
+  } catch (e) {
+    window.$message?.error(e.response?.data?.error || '生成失败')
+  }
+}
+
+function scheduleSave(shot) {
+  let t = saveTimers.get(shot.id)
+  if (t) clearTimeout(t)
+  t = setTimeout(() => {
+    saveTimers.delete(shot.id)
+    store.saveShot(shot.id, {
+      scene: shot.scene,
+      characters: shot.characters,
+      prompt: shot.prompt,
+      dialogue: shot.dialogue,
+      camera: shot.camera,
+    }).catch(() => window.$message?.error('保存失败'))
+  }, 500)
+  saveTimers.set(shot.id, t)
 }
 
 function statusText(s) {
-  return { none: '未抽取', extracting: '抽取中', ready: '就绪', failed: '失败' }[s] || s
+  return { none: '未解析', analyzing: '解析中', ready: '已就绪', failed: '失败' }[s] || s
+}
+function storyboardStatusText(s) {
+  return { none: '未生成', extracting: '生成中', ready: '已就绪', failed: '失败' }[s] || s
 }
 </script>
 
@@ -205,6 +328,91 @@ function statusText(s) {
   text-overflow: ellipsis;
 }
 
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-badge.status-none {
+  color: var(--color-text-muted);
+  border-color: var(--color-tint-white-12);
+  background: var(--color-tint-white-04);
+}
+.status-badge.status-analyzing,
+.status-badge.status-extracting {
+  color: #ffd28f;
+  border-color: rgba(255, 184, 92, 0.4);
+  background: rgba(255, 184, 92, 0.14);
+}
+.status-badge.status-ready {
+  color: #8cefff;
+  border-color: rgba(0, 202, 224, 0.35);
+  background: rgba(0, 202, 224, 0.12);
+}
+.status-badge.status-failed {
+  color: #ff9d9d;
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.storyboard-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px 24px;
+}
+
+/* Analyze prompt */
+.analyze-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 24px;
+  background: var(--color-tint-white-02);
+  border: 1px solid rgba(0, 202, 224, 0.28);
+  border-left: 3px solid #00cae0;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px var(--color-tint-black-30);
+}
+.analyze-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 202, 224, 0.14);
+  border: 1px solid rgba(0, 202, 224, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00cae0;
+}
+.analyze-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.analyze-info {
+  flex: 1;
+  min-width: 0;
+}
+.analyze-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.analyze-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* Generate button */
 .generate-btn {
   display: inline-flex;
   align-items: center;
@@ -222,6 +430,11 @@ function statusText(s) {
   transition: all .2s;
   font-family: inherit;
 }
+.generate-btn.small {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+}
 .generate-btn:hover:not(:disabled) {
   background: rgba(0, 202, 224, 0.28);
   box-shadow: 0 2px 10px rgba(0, 202, 224, 0.2);
@@ -237,6 +450,10 @@ function statusText(s) {
   width: 15px;
   height: 15px;
 }
+.generate-btn.small .btn-icon {
+  width: 13px;
+  height: 13px;
+}
 .btn-icon.spin {
   animation: shot-spin 0.9s linear infinite;
 }
@@ -244,78 +461,41 @@ function statusText(s) {
   to { transform: rotate(360deg); }
 }
 
-/* status badge reused */
-.topbar-status.status-badge {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-.topbar-status.status-none {
-  color: var(--color-text-muted);
-  border-color: var(--color-tint-white-12);
-  background: var(--color-tint-white-04);
-}
-.topbar-status.status-extracting {
-  color: #ffd28f;
-  border-color: rgba(255, 184, 92, 0.4);
-  background: rgba(255, 184, 92, 0.14);
-}
-.topbar-status.status-ready {
-  color: #8cefff;
-  border-color: rgba(0, 202, 224, 0.35);
-  background: rgba(0, 202, 224, 0.12);
-}
-.topbar-status.status-failed {
-  color: #ff9d9d;
-  border-color: rgba(239, 68, 68, 0.45);
-  background: rgba(239, 68, 68, 0.16);
-}
-
-.shots-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 24px 24px;
-}
-
-.shots-grid {
+/* Analysis cards */
+.analysis-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 14px;
+  margin-bottom: 18px;
 }
-
-.outline-card {
+.info-card {
   background: var(--color-tint-white-02);
-  border: 1px solid rgba(0, 202, 224, 0.28);
+  border: 1px solid rgba(0, 202, 224, 0.22);
   border-left: 3px solid #00cae0;
   border-radius: 14px;
   padding: 14px 18px;
-  margin-bottom: 16px;
   box-shadow: 0 2px 12px var(--color-tint-black-30);
 }
-.outline-header {
+.info-header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
-.outline-dot {
+.info-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #00cae0;
   box-shadow: 0 0 8px rgba(0, 202, 224, 0.6);
 }
-.outline-title {
+.info-title {
   font-size: 13px;
   font-weight: 700;
   color: #00cae0;
   letter-spacing: 0.04em;
 }
-.outline-text {
+.info-text {
   margin: 0;
   font-size: 14px;
   line-height: 1.7;
@@ -324,10 +504,77 @@ function statusText(s) {
   word-break: break-word;
 }
 
-.shot-card {
+/* Plot list */
+.plot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.plot-card {
   background: var(--color-tint-white-02);
   border: 1px solid var(--color-tint-white-06);
   border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.plot-card:hover {
+  border-color: var(--color-tint-white-12);
+  box-shadow: 0 8px 24px var(--color-tint-black-30);
+}
+.plot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.plot-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.plot-index {
+  font-size: 13px;
+  font-weight: 700;
+  color: #00cae0;
+  flex-shrink: 0;
+}
+.plot-title-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.plot-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Shots sub-grid */
+.shots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.shot-card {
+  background: var(--color-tint-white-03);
+  border: 1px solid var(--color-tint-white-06);
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -335,39 +582,31 @@ function statusText(s) {
 }
 .shot-card:hover {
   border-color: var(--color-tint-white-12);
-  box-shadow: 0 8px 24px var(--color-tint-black-30);
+  box-shadow: 0 6px 18px var(--color-tint-black-30);
 }
-
 .shot-header {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--color-tint-white-06);
   background: var(--color-tint-white-03);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
-
 .shot-index {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #00cae0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-
 .shot-body {
-  padding: 12px 14px 14px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
-
 .shot-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
-
 .shot-field-label {
   font-size: 11px;
   font-weight: 500;
@@ -375,25 +614,33 @@ function statusText(s) {
   letter-spacing: 0.02em;
 }
 
-.shots-placeholder {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--color-text-muted);
-  font-size: 13px;
+.plot-empty {
+  padding: 8px 0;
 }
 
-.shots-empty-wrap {
-  margin-top: 80px;
+.storyboard-empty-wrap {
+  margin-top: 60px;
   display: flex;
   justify-content: center;
 }
 
 @media (max-width: 768px) {
   .storyboard-topbar { padding: 12px 14px; }
-  .shots-scroll { padding: 12px 14px 16px; }
+  .storyboard-scroll { padding: 12px 14px 16px; }
+  .analysis-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
   .shots-grid {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+  .analyze-block {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .plot-header {
+    flex-wrap: wrap;
   }
 }
 </style>
