@@ -111,6 +111,24 @@ func GetPort() string {
 	return port
 }
 
+// GetNovelLLMBaseURL 小说抽分镜用的中转站 base URL，默认回退到 OPENAI_BASE_URL。
+func GetNovelLLMBaseURL() string {
+	v := os.Getenv("NOVEL_LLM_BASE_URL")
+	if v == "" {
+		v = os.Getenv("OPENAI_BASE_URL")
+	}
+	return v
+}
+
+// GetNovelLLMAPIKey 小说抽分镜用的中转站 key，默认回退到 OPENAI_API_KEY。
+func GetNovelLLMAPIKey() string {
+	v := os.Getenv("NOVEL_LLM_API_KEY")
+	if v == "" {
+		v = os.Getenv("OPENAI_API_KEY")
+	}
+	return v
+}
+
 // GetNovelLLMModel 抽分镜用的中转站 chat 模型名。
 func GetNovelLLMModel() string {
 	m := os.Getenv("NOVEL_LLM_MODEL")

@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	"google-ai-proxy/internal/config"
 )
 
 type relayChatMessage struct {
@@ -19,10 +20,10 @@ type relayChatMessage struct {
 // RelayChat 调中转站 chat/completions（OPENAI_BASE_URL），返回 assistant 文本。
 // response_format=json_object，要求模型返回 JSON 文本。
 func RelayChat(model, systemPrompt, userContent string) (string, error) {
-	baseURL := strings.TrimRight(os.Getenv("OPENAI_BASE_URL"), "/")
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	baseURL := strings.TrimRight(config.GetNovelLLMBaseURL(), "/")
+	apiKey := config.GetNovelLLMAPIKey()
 	if baseURL == "" || apiKey == "" {
-		return "", fmt.Errorf("中转站未配置 (OPENAI_BASE_URL / OPENAI_API_KEY)")
+		return "", fmt.Errorf("中转站未配置 (NOVEL_LLM_BASE_URL/API_KEY 或 OPENAI_BASE_URL/API_KEY)")
 	}
 
 	body := map[string]interface{}{
