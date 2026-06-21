@@ -2,6 +2,7 @@ package api
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -207,6 +208,7 @@ func TriggerStoryboard(c *gin.Context) {
 		shots, err := novel.ExtractShots(content)
 		if err != nil {
 			status = "failed"
+			log.Printf("[Novel] 分镜抽取失败 [章节:%d]: %v", chapterID, err)
 			if credits > 0 {
 				refundCredits(userID, credits, "novel-storyboard-failed")
 			}
@@ -225,6 +227,7 @@ func TriggerStoryboard(c *gin.Context) {
 			}
 			if err := db.DB.Create(&rows).Error; err != nil {
 				status = "failed"
+				log.Printf("[Novel] 分镜保存失败 [章节:%d]: %v", chapterID, err)
 				if credits > 0 {
 					refundCredits(userID, credits, "novel-storyboard-save-failed")
 				}
