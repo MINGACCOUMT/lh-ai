@@ -146,6 +146,19 @@ func main() {
 			generationsGroup.DELETE("/:id", api.DeleteGeneration)
 		}
 
+		// Novel
+		novelGroup := apiGroup.Group("/novel")
+		novelGroup.Use(api.UserAuthMiddleware())
+		{
+			novelGroup.POST("/upload", api.UploadNovel)
+			novelGroup.GET("", api.ListNovels)
+			novelGroup.GET("/:id", api.GetNovel)
+			novelGroup.DELETE("/:id", api.DeleteNovel)
+			novelGroup.POST("/chapters/:id/storyboard", api.TriggerStoryboard)
+			novelGroup.GET("/chapters/:id/storyboard", api.GetStoryboard)
+			novelGroup.PUT("/shots/:id", api.UpdateShot)
+		}
+
 		// Admin moderation
 		adminGroup := apiGroup.Group("/admin")
 		adminGroup.Use(adminapi.AuthMiddleware())
