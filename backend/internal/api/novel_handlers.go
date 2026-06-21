@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const novelMaxUploadBytes = 10 * 1024 * 1024 // 10MB
+const novelMaxUploadBytes = 50 * 1024 * 1024 // 50MB
 
 // UploadNovel POST /api/novel/upload  multipart file=.txt
 func UploadNovel(c *gin.Context) {
@@ -30,7 +30,7 @@ func UploadNovel(c *gin.Context) {
 		return
 	}
 	if file.Size > novelMaxUploadBytes {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "文件过大（上限 10MB）"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "文件过大（上限 50MB）"})
 		return
 	}
 	f, err := file.Open()
