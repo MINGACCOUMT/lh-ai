@@ -518,7 +518,7 @@ func StoryboardForPlot(c *gin.Context) {
 			}
 		}
 		db.DB.Model(&db.NovelPlot{}).Where("id = ?", plotID).
-			Updates(map[string]interface{}{"storyboard_status": status, "updated_at": time.Now()})
+			Update("storyboard_status", status)
 	}(plotID, userID, credits, plot, ch.Characters, ch.Scenes)
 
 	c.JSON(http.StatusOK, gin.H{"status": "extracting"})
