@@ -49,8 +49,9 @@ type NovelShot struct {
 type NovelPlot struct {
 	ID        uint64    `gorm:"primaryKey" json:"id"`
 	ChapterID uint64    `gorm:"type:bigint;index;not null" json:"chapter_id"`
-	PlotIndex int       `gorm:"type:int;not null" json:"plot_index"`
-	Title     string    `gorm:"type:varchar(200)" json:"title"`
-	Summary   string    `gorm:"type:varchar(1000)" json:"summary"`
-	CreatedAt time.Time `gorm:"type:datetime" json:"created_at"`
+	PlotIndex        int       `gorm:"type:int;not null" json:"plot_index"`
+	Title            string    `gorm:"type:varchar(200)" json:"title"`
+	Summary          string    `gorm:"type:varchar(1000)" json:"summary"`
+	StoryboardStatus string    `gorm:"type:varchar(20);default:'none'" json:"storyboard_status"`
+	CreatedAt        time.Time `gorm:"type:datetime" json:"created_at"`
 }

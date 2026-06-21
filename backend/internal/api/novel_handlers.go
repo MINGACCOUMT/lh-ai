@@ -428,8 +428,98 @@ func GetChapterDetail(c *gin.Context) {
 	}
 	var plots []db.NovelPlot
 	db.DB.Where("chapter_id = ?", chapterID).Order("plot_index ASC").Find(&plots)
+	type plotWithShots struct {
+		db.NovelPlot
+		Shots []db.NovelShot `json:"shots"`
+	}
+	out := make([]plotWithShots, 0, len(plots))
+	for _, p := range plots {
+		var shots []db.NovelShot
+		db.DB.Where("plot_id = ?", p.ID).Order("shot_index ASC").Find(&shots)
+		out = append(out, plotWithShots{NovelPlot: p, Shots: shots})
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"chapter": ch,
-		"plots":   plots,
+		"plots":   out,
 	})
+}
+
+// StoryboardForPlot POST /api/novel/plots/:id/storyboard
+func StoryboardForPlot(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	plotID := parseUintParam(c.Param("id"))
+	var plot db.NovelPlot
+	if err := db.DB.First(&plot, plotID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "情节不存在"})
+		return
+	}
+	var ch db.NovelChapter
+	if err := db.DB.First(&ch, plot.ChapterID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "章节不存在"})
+		return
+	}
+	var n db.Novel
+	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	if plot.StoryboardStatus == "extracting" {
+		c.JSON(http.StatusConflict, gin.H{"error": "该情节正在生成分镜"})
+		return
+	}
+	credits := config.GetNovelStoryboardCredits()
+	if credits > 0 {
+		if _, ok := getActiveUser(c, userID); !ok {
+			return
+		}
+		deduct := db.DB.Model(&db.User{}).Where("id = ? AND credits >= ?", userID, credits).
+			Update("credits", gorm.Expr("credits - ?", credits))
+		if deduct.Error != nil || deduct.RowsAffected == 0 {
+			c.JSON(http.StatusPaymentRequired, gin.H{"error": "钻石不足"})
+			return
+		}
+		if err := recordCreditTransaction(db.DB, userID, -credits, "novel_plot_storyboard_cost", "novel", "", "情节分镜"); err != nil {
+			refundCredits(userID, credits, "novel-plot-storyboard-ledger-failed")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "记录流水失败"})
+			return
+		}
+	}
+	db.DB.Model(&plot).Update("storyboard_status", "extracting")
+	db.DB.Where("plot_id = ?", plotID).Delete(&db.NovelShot{})
+
+	go func(plotID, userID uint64, credits int, p db.NovelPlot, chChars, chScenes string) {
+		status := "ready"
+		shots, err := novel.ExtractShotsForPlot(novel.Plot{Title: p.Title, Summary: p.Summary}, chChars, chScenes)
+		if err != nil {
+			status = "failed"
+			log.Printf("[Novel] 情节分镜失败 [情节:%d]: %v", plotID, err)
+			if credits > 0 {
+				refundCredits(userID, credits, "novel-plot-storyboard-failed")
+			}
+		} else {
+			rows := make([]db.NovelShot, 0, len(shots))
+			for i, s := range shots {
+				rows = append(rows, db.NovelShot{
+					PlotID:     plotID,
+					ShotIndex:  i + 1,
+					Scene:      s.Scene,
+					Characters: s.Characters,
+					Prompt:     s.Prompt,
+					Dialogue:   s.Dialogue,
+					Camera:     s.Camera,
+				})
+			}
+			if err := db.DB.Create(&rows).Error; err != nil {
+				status = "failed"
+				log.Printf("[Novel] 情节分镜保存失败 [情节:%d]: %v", plotID, err)
+				if credits > 0 {
+					refundCredits(userID, credits, "novel-plot-storyboard-save-failed")
+				}
+			}
+		}
+		db.DB.Model(&db.NovelPlot{}).Where("id = ?", plotID).
+			Updates(map[string]interface{}{"storyboard_status": status, "updated_at": time.Now()})
+	}(plotID, userID, credits, plot, ch.Characters, ch.Scenes)
+
+	c.JSON(http.StatusOK, gin.H{"status": "extracting"})
 }

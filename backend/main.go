@@ -159,6 +159,7 @@ func main() {
 			novelGroup.POST("/chapters/:id/analyze", api.AnalyzeChapterHandler)
 			novelGroup.GET("/chapters/:id", api.GetChapterDetail)
 			novelGroup.PUT("/shots/:id", api.UpdateShot)
+			novelGroup.POST("/plots/:id/storyboard", api.StoryboardForPlot)
 		}
 
 		// Admin moderation

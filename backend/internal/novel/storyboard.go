@@ -43,6 +43,26 @@ func ExtractStoryboard(chapterContent string) (*StoryboardResult, error) {
 	return parseStoryboardJSON(raw)
 }
 
+const plotStoryboardSystemPrompt = `你是一名影视分镜师。我会给你一个情节（标题+简述）及其所在章节的人物/场景信息，请把这个情节拆成若干分镜（镜头），数量按情节长短自适应（通常 2~5 个）。
+返回 JSON：{"shots":[{"scene":"场景","characters":"出场人物，逗号分隔","prompt":"AI 绘图画面提示词（中文，描述这一镜的视觉画面，不含对白）","dialogue":"对白或旁白，没有则空字符串","camera":"镜头运动，如 推进/平移/特写"}]}
+只返回 JSON，不要解释。`
+
+// ExtractShotsForPlot 为单个情节生成分镜（数量自适应）。传入章节人物/场景做上下文，保证一致。
+func ExtractShotsForPlot(plot Plot, chapterCharacters, chapterScenes string) ([]Shot, error) {
+	model := config.GetNovelLLMModel()
+	user := fmt.Sprintf("情节标题：%s\n情节简述：%s\n\n本章人物：\n%s\n\n本章场景：\n%s",
+		plot.Title, plot.Summary, chapterCharacters, chapterScenes)
+	raw, err := RelayChat(model, plotStoryboardSystemPrompt, user)
+	if err != nil {
+		return nil, err
+	}
+	res, err := parseStoryboardJSON(raw) // 复用：解析 {shots:[...]}（outline 可空）
+	if err != nil {
+		return nil, err
+	}
+	return res.Shots, nil
+}
+
 var jsonShotRe = regexp.MustCompile(`(?s)\{.*\}`)
 
 // parseStoryboardJSON 解析 LLM 返回（兼容裸 JSON / ```json 代码块）。shots 超 9 截断、为 0 报错。
