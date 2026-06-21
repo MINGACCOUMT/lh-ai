@@ -4,11 +4,14 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
+	"google-ai-proxy/internal/config"
 	"google-ai-proxy/internal/db"
 	"google-ai-proxy/internal/novel"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const novelMaxUploadBytes = 10 * 1024 * 1024 // 10MB
@@ -144,4 +147,172 @@ func DeleteNovel(c *gin.Context) {
 	}
 	db.DB.Delete(&n)
 	c.JSON(http.StatusOK, gin.H{"message": "已删除"})
+}
+
+// parseUintParam 把路由参数解析为 uint64（若包内已存在同名函数则不要重复定义）。
+func parseUintParam(s string) uint64 {
+	var n uint64
+	for _, ch := range s {
+		if ch < '0' || ch > '9' {
+			break
+		}
+		n = n*10 + uint64(ch-'0')
+	}
+	return n
+}
+
+// TriggerStoryboard POST /api/novel/chapters/:id/storyboard
+func TriggerStoryboard(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	chapterID := parseUintParam(c.Param("id"))
+
+	var ch db.NovelChapter
+	if err := db.DB.First(&ch, chapterID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "章节不存在"})
+		return
+	}
+	var n db.Novel
+	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	if ch.StoryboardStatus == "extracting" {
+		c.JSON(http.StatusConflict, gin.H{"error": "该章节正在抽取中"})
+		return
+	}
+
+	credits := config.GetNovelStoryboardCredits()
+	if credits > 0 {
+		if _, ok := getActiveUser(c, userID); !ok {
+			return
+		}
+		deduct := db.DB.Model(&db.User{}).Where("id = ? AND credits >= ?", userID, credits).
+			Update("credits", gorm.Expr("credits - ?", credits))
+		if deduct.Error != nil || deduct.RowsAffected == 0 {
+			c.JSON(http.StatusPaymentRequired, gin.H{"error": "钻石不足"})
+			return
+		}
+		if err := recordCreditTransaction(db.DB, userID, -credits, "novel_storyboard_cost", "novel", "", "分镜抽取"); err != nil {
+			refundCredits(userID, credits, "novel-storyboard-ledger-failed")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "记录流水失败"})
+			return
+		}
+	}
+
+	db.DB.Model(&ch).Update("storyboard_status", "extracting")
+	db.DB.Where("chapter_id = ?", chapterID).Delete(&db.NovelShot{})
+
+	go func(chapterID, userID uint64, credits int, content string) {
+		status := "ready"
+		shots, err := novel.ExtractShots(content)
+		if err != nil {
+			status = "failed"
+			if credits > 0 {
+				refundCredits(userID, credits, "novel-storyboard-failed")
+			}
+		} else {
+			rows := make([]db.NovelShot, 0, len(shots))
+			for i, s := range shots {
+				rows = append(rows, db.NovelShot{
+					ChapterID:  chapterID,
+					ShotIndex:  i + 1,
+					Scene:      s.Scene,
+					Characters: s.Characters,
+					Prompt:     s.Prompt,
+					Dialogue:   s.Dialogue,
+					Camera:     s.Camera,
+				})
+			}
+			if err := db.DB.Create(&rows).Error; err != nil {
+				status = "failed"
+				if credits > 0 {
+					refundCredits(userID, credits, "novel-storyboard-save-failed")
+				}
+			}
+		}
+		db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).
+			Updates(map[string]interface{}{"storyboard_status": status, "updated_at": time.Now()})
+	}(chapterID, userID, credits, ch.Content)
+
+	c.JSON(http.StatusOK, gin.H{"status": "extracting"})
+}
+
+// GetStoryboard GET /api/novel/chapters/:id/storyboard
+func GetStoryboard(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	chapterID := parseUintParam(c.Param("id"))
+	var ch db.NovelChapter
+	if err := db.DB.First(&ch, chapterID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "章节不存在"})
+		return
+	}
+	var n db.Novel
+	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	var shots []db.NovelShot
+	db.DB.Where("chapter_id = ?", chapterID).Order("shot_index ASC").Find(&shots)
+	c.JSON(http.StatusOK, gin.H{
+		"status":     ch.StoryboardStatus,
+		"chapter_id": ch.ID,
+		"title":      ch.Title,
+		"content":    ch.Content,
+		"shots":      shots,
+	})
+}
+
+// UpdateShot PUT /api/novel/shots/:id
+func UpdateShot(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	shotID := parseUintParam(c.Param("id"))
+	var shot db.NovelShot
+	if err := db.DB.First(&shot, shotID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "分镜不存在"})
+		return
+	}
+	var ch db.NovelChapter
+	if err := db.DB.First(&ch, shot.ChapterID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "章节不存在"})
+		return
+	}
+	var n db.Novel
+	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	var req struct {
+		Scene      *string `json:"scene"`
+		Characters *string `json:"characters"`
+		Prompt     *string `json:"prompt"`
+		Dialogue   *string `json:"dialogue"`
+		Camera     *string `json:"camera"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式无效"})
+		return
+	}
+	updates := map[string]interface{}{}
+	if req.Scene != nil {
+		updates["scene"] = *req.Scene
+	}
+	if req.Characters != nil {
+		updates["characters"] = *req.Characters
+	}
+	if req.Prompt != nil {
+		updates["prompt"] = *req.Prompt
+	}
+	if req.Dialogue != nil {
+		updates["dialogue"] = *req.Dialogue
+	}
+	if req.Camera != nil {
+		updates["camera"] = *req.Camera
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无更新字段"})
+		return
+	}
+	updates["updated_at"] = time.Now()
+	db.DB.Model(&shot).Updates(updates)
+	c.JSON(http.StatusOK, gin.H{"message": "已更新"})
 }
