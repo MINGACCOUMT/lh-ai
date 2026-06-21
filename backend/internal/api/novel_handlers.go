@@ -101,7 +101,7 @@ func ListNovels(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": novels, "total": total, "limit": limit, "offset": offset})
 }
 
-// GetNovel GET /api/novel/:id
+// GetNovel GET /api/novel/:id  (chapters paginated via ?limit=&offset=)
 func GetNovel(c *gin.Context) {
 	userID := c.GetUint64("userID")
 	var n db.Novel
@@ -113,8 +113,11 @@ func GetNovel(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
+	limit, offset := parseListPagination(c)
 	var chapters []db.NovelChapter
-	db.DB.Where("novel_id = ?", n.ID).Order("chapter_index ASC").Find(&chapters)
+	db.DB.Where("novel_id = ?", n.ID).Order("chapter_index ASC").Limit(limit).Offset(offset).Find(&chapters)
+	var chapterTotal int64
+	db.DB.Model(&db.NovelChapter{}).Where("novel_id = ?", n.ID).Count(&chapterTotal)
 	type chLite struct {
 		ID               uint64 `json:"id"`
 		ChapterIndex     int    `json:"chapter_index"`
@@ -125,7 +128,13 @@ func GetNovel(c *gin.Context) {
 	for _, ch := range chapters {
 		lite = append(lite, chLite{ch.ID, ch.ChapterIndex, ch.Title, ch.StoryboardStatus})
 	}
-	c.JSON(http.StatusOK, gin.H{"novel": n, "chapters": lite})
+	c.JSON(http.StatusOK, gin.H{
+		"novel":         n,
+		"chapters":      lite,
+		"chapter_total": chapterTotal,
+		"limit":         limit,
+		"offset":        offset,
+	})
 }
 
 // DeleteNovel DELETE /api/novel/:id
@@ -205,7 +214,7 @@ func TriggerStoryboard(c *gin.Context) {
 
 	go func(chapterID, userID uint64, credits int, content string) {
 		status := "ready"
-		shots, err := novel.ExtractShots(content)
+		res, err := novel.ExtractStoryboard(content)
 		if err != nil {
 			status = "failed"
 			log.Printf("[Novel] 分镜抽取失败 [章节:%d]: %v", chapterID, err)
@@ -213,8 +222,8 @@ func TriggerStoryboard(c *gin.Context) {
 				refundCredits(userID, credits, "novel-storyboard-failed")
 			}
 		} else {
-			rows := make([]db.NovelShot, 0, len(shots))
-			for i, s := range shots {
+			rows := make([]db.NovelShot, 0, len(res.Shots))
+			for i, s := range res.Shots {
 				rows = append(rows, db.NovelShot{
 					ChapterID:  chapterID,
 					ShotIndex:  i + 1,
@@ -231,6 +240,10 @@ func TriggerStoryboard(c *gin.Context) {
 				if credits > 0 {
 					refundCredits(userID, credits, "novel-storyboard-save-failed")
 				}
+			} else {
+				status = "ready"
+				db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).
+					Update("outline", res.Outline)
 			}
 		}
 		db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).
@@ -260,6 +273,7 @@ func GetStoryboard(c *gin.Context) {
 		"status":     ch.StoryboardStatus,
 		"chapter_id": ch.ID,
 		"title":      ch.Title,
+		"outline":    ch.Outline,
 		"content":    ch.Content,
 		"shots":      shots,
 	})

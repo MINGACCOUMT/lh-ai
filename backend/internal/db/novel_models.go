@@ -20,6 +20,7 @@ type NovelChapter struct {
 	ChapterIndex     int       `gorm:"type:int;not null" json:"chapter_index"`
 	Title            string    `gorm:"type:varchar(200)" json:"title"`
 	Content          string    `gorm:"type:longtext" json:"content"`
+	Outline          string    `gorm:"type:text" json:"outline"`
 	StoryboardStatus string    `gorm:"type:varchar(20);default:'none'" json:"storyboard_status"`
 	CreatedAt        time.Time `gorm:"type:datetime" json:"created_at"`
 	UpdatedAt        time.Time `gorm:"type:datetime" json:"updated_at"`
