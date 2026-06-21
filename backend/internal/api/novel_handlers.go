@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"google-ai-proxy/internal/config"
 	"google-ai-proxy/internal/db"
 	"google-ai-proxy/internal/novel"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/text/encoding/simplifiedchinese"
 	"gorm.io/gorm"
 )
 
@@ -45,6 +47,15 @@ func UploadNovel(c *gin.Context) {
 		return
 	}
 	content := string(raw)
+	if !utf8.Valid(raw) {
+		// 非 UTF-8，按 GBK/GB18030 解码（中文 .txt 常见编码）
+		decoded, derr := simplifiedchinese.GB18030.NewDecoder().Bytes(raw)
+		if derr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "文件编码无法识别，请存为 UTF-8 或 GBK 编码"})
+			return
+		}
+		content = string(decoded)
+	}
 
 	chapters := novel.ParseChapters(content)
 	title := strings.TrimSuffix(file.Filename, ".txt")
