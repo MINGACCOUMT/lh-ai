@@ -60,14 +60,18 @@
 
 ## 7. 已完成 vs 待做
 
-**已完成**：novels/chapters/shots 表+模型、上传切章（正则+空行修复）、CRUD、章节分页、glm-5.2 接入、outline 字段、UI 三页+分页+大纲展示+解析按钮、50MB 上限。
+**已完成（①②③，前后端 + 端到端验证）**：
+- 数据层：novels / novel_chapters(+outline/characters/scenes/analysis_status) / novel_plots(+storyboard_status) / novel_shots(plot_id)；迁移至 031。
+- 上传切章（正则 + 空行修复）、CRUD、章节分页、50MB 上限。
+- glm-5.2 接入（智谱 Anthropic 端点 `/api/anthropic`）。
+- **① 解析** `POST /chapters/:id/analyze`：大纲 + 人物画像 + 场景 + **情节列表**（characters/scenes 数组已归一化为可读文本）✅
+- **② 情节下分镜** `POST /plots/:id/storyboard`：每情节自适应 2~5 镜 ✅
+- **③ 前端章节详情**：解析按钮 → 大纲/人物/场景 → 情节列表 → 情节下分镜 + 镜头可编辑 ✅
 
-**待做（本版）**：
-1. 加 `novel_plots` 表 + shots 改挂 plot_id（迁移 029/030）。
-2. 解析改成产 **情节列表**（+大纲/人物/场景），存 novel_chapters + novel_plots。拆 `/analyze` 接口。
-3. 生成分镜改成**情节下**自适应（`/plots/:id/storyboard`）。
-4. 资产库：novel_characters/novel_scenes + 生图接口 + 分镜页"生成人物/场景图"按钮。
-5. 前端：章节详情展示情节列表；情节下展开分镜；资产生成 UI。
+**待做**：
+4. **④ 资产库**：novel_characters / novel_scenes 表 + 生图接口 + 分镜页"生成人物/场景图"按钮（小说级复用，保一致性）。
+
+**已知遗留（非阻塞）**：① 章节切分会丢"楔子/序章"（第一个"第X章"前的内容）；② 正文里独占一行、以"第X章"开头的句子可能被误切。
 
 ## 8. 后续子项目（不在本版）
 

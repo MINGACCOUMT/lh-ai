@@ -10,6 +10,8 @@
 
 **Spec:** [docs/superpowers/specs/2026-06-21-novel-storyboard-design.md](../specs/2026-06-21-novel-storyboard-design.md)
 
+> **⚠️ 状态（2026-06-21 更新）**：本计划是 v1（章→9 分镜平铺）。**Task 1–13 已全部实现并验证**。但设计随后演进为 **v2**（加「情节」层、解析/分镜两阶段、glm-5.2），见 [spec-v2](../specs/2026-06-21-novel-storyboard-design-v2.md)。v2 的 ①②③（情节层、解析产情节、情节下分镜、前端）已完成验证；**④ 资产库 + 视频 B-3 待做**。当前总进度见 [docs/dev-guide/PROGRESS.md](../../dev-guide/PROGRESS.md)。下面 Task 1–14 的勾选状态保留作历史记录。
+
 **测试策略:** 纯逻辑（切章正则、分镜 JSON 解析）用 `go test` 单测；handler/前端用运行验证（后端 :8092 + 前端 :5173 已在跑，curl + 浏览器）。
 
 ---
