@@ -101,12 +101,14 @@ const navItems = computed(() => [
   { name: 'inspiration', path: '/inspiration', icon: 'inspiration', label: t('nav.inspiration') },
   { name: 'generate', path: '/generate', icon: 'generate', label: t('nav.generate') },
   { name: 'assets', path: '/assets', icon: 'assets', label: t('nav.assets') },
+  { name: 'novel-list', path: '/novel', icon: 'assets', label: t('nav.novel') },
   { name: 'tools', path: '/tools', icon: 'tools', label: t('nav.tools') }
 ])
 
 const isNavActive = (itemName) => {
   const name = currentRoute.value
   if (itemName === 'tools') return name === 'tools' || name === 'image-to-svg' || name === 'reverse-prompt' || name === 'image-convert'
+  if (itemName === 'novel-list') return name === 'novel-list' || name === 'novel-detail' || name === 'chapter-storyboard'
   return name === itemName
 }
 

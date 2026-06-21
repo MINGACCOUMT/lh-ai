@@ -2,6 +2,7 @@
   "nav.inspiration": "Explore",
   "nav.generate": "Create",
   "nav.assets": "Assets",
+  "nav.novel": "Novels",
   "common.share": "Share",
   "common.delete": "Delete",
   "common.loading": "Loading...",
@@ -561,5 +562,14 @@
   "bind.submitting": "Binding...",
   "bind.success": "Email bound successfully",
   "bind.failed": "Binding failed",
-  "bind.hint": "After binding, you can use email login and password reset"
+  "bind.hint": "After binding, you can use email login and password reset",
+  "novel.title": "My Novels",
+  "novel.upload": "Upload Novel",
+  "novel.open": "Open",
+  "novel.delete": "Delete",
+  "novel.deleteConfirm": "Delete this novel and all its chapters and storyboards?",
+  "novel.empty": "No novels yet — upload a .txt to start",
+  "novel.storyboard": "Storyboard",
+  "novel.generateStoryboard": "Generate Storyboard",
+  "novel.noStoryboard": "Click 'Generate Storyboard' top-right to start"
 }

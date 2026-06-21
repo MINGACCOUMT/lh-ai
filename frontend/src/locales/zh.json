@@ -2,6 +2,7 @@
   "nav.inspiration": "灵感",
   "nav.generate": "生成",
   "nav.assets": "资产",
+  "nav.novel": "小说",
   "sidebar.getDiamonds": "获取钻石",
   "sidebar.diamondBalance": "钻石余额",
   "sidebar.joinCommunity": "加入社群",
@@ -561,5 +562,14 @@
   "bind.submitting": "绑定中...",
   "bind.success": "邮箱绑定成功",
   "bind.failed": "绑定失败",
-  "bind.hint": "绑定邮箱后可使用邮箱登录和密码重置"
+  "bind.hint": "绑定邮箱后可使用邮箱登录和密码重置",
+  "novel.title": "我的小说",
+  "novel.upload": "上传小说",
+  "novel.open": "打开",
+  "novel.delete": "删除",
+  "novel.deleteConfirm": "删除整本小说及其章节和分镜？",
+  "novel.empty": "还没有小说，上传一个 .txt 试试",
+  "novel.storyboard": "分镜",
+  "novel.generateStoryboard": "生成分镜",
+  "novel.noStoryboard": "点击右上角生成分镜"
 }

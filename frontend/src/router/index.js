@@ -16,6 +16,9 @@ const Tools = () => import('../views/Tools.vue')
 const ImageToSvg = () => import('../views/ImageToSvg.vue')
 const ReversePrompt = () => import('../views/ReversePrompt.vue')
 const ImageConvert = () => import('../views/ImageConvert.vue')
+const NovelList = () => import('../views/NovelList.vue')
+const NovelDetail = () => import('../views/NovelDetail.vue')
+const ChapterStoryboard = () => import('../views/ChapterStoryboard.vue')
 
 const routes = [
   {
@@ -156,7 +159,10 @@ const routes = [
           descriptionKey: 'seo.imageConvert.description',
           keywordKey: 'seo.imageConvert.keywords'
         }
-      }
+      },
+      { path: 'novel', name: 'novel-list', component: NovelList, meta: { requiresAuth: true } },
+      { path: 'novel/:id', name: 'novel-detail', component: NovelDetail, meta: { requiresAuth: true } },
+      { path: 'novel/chapter/:cid', name: 'chapter-storyboard', component: ChapterStoryboard, meta: { requiresAuth: true } }
     ]
   },
   {
