@@ -103,6 +103,7 @@ func GetDefault() (ImageGenerator, error) {
 
 // modelOrder 定义模型在列表中的显示顺序
 var modelOrder = []string{
+	"gpt-image-2",
 	"gemini-3.1-flash-image-preview",
 	"gemini-3-pro-image-preview",
 	"doubao-seedream-4-5",

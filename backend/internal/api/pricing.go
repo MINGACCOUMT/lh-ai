@@ -15,6 +15,7 @@ const (
 	ModelSeedream45  = "doubao-seedream-4-5"
 	ModelSeedance15  = "doubao-seedance-1-5-pro-251215"
 	ModelVeo31       = "veo-3.1-generate-preview"
+	ModelGPTImage2   = "gpt-image-2"
 )
 
 var ModelDisplayNames = map[string]string{
@@ -23,6 +24,7 @@ var ModelDisplayNames = map[string]string{
 	ModelSeedream45:  "Seedream-4.5",
 	ModelSeedance15:  "Seedance-1.5",
 	ModelVeo31:       "Veo 3.1",
+	ModelGPTImage2:   "GPT Image 2",
 }
 
 func GetModelDisplayName(model string) string {
@@ -49,6 +51,11 @@ var ImagePricingConfig = map[string]map[string]int{
 	ModelSeedream45: {
 		"2K": 6,
 		"4K": 10,
+	},
+	ModelGPTImage2: {
+		"1K": 8,
+		"2K": 12,
+		"4K": 20,
 	},
 }
 
