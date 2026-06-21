@@ -333,3 +333,103 @@ func UpdateShot(c *gin.Context) {
 	db.DB.Model(&shot).Updates(updates)
 	c.JSON(http.StatusOK, gin.H{"message": "已更新"})
 }
+
+// AnalyzeChapterHandler POST /api/novel/chapters/:id/analyze
+func AnalyzeChapterHandler(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	chapterID := parseUintParam(c.Param("id"))
+	var ch db.NovelChapter
+	if err := db.DB.First(&ch, chapterID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "章节不存在"})
+		return
+	}
+	var n db.Novel
+	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	if ch.AnalysisStatus == "analyzing" {
+		c.JSON(http.StatusConflict, gin.H{"error": "该章节正在解析中"})
+		return
+	}
+	credits := config.GetNovelStoryboardCredits()
+	if credits > 0 {
+		if _, ok := getActiveUser(c, userID); !ok {
+			return
+		}
+		deduct := db.DB.Model(&db.User{}).Where("id = ? AND credits >= ?", userID, credits).
+			Update("credits", gorm.Expr("credits - ?", credits))
+		if deduct.Error != nil || deduct.RowsAffected == 0 {
+			c.JSON(http.StatusPaymentRequired, gin.H{"error": "钻石不足"})
+			return
+		}
+		if err := recordCreditTransaction(db.DB, userID, -credits, "novel_analyze_cost", "novel", "", "章节解析"); err != nil {
+			refundCredits(userID, credits, "novel-analyze-ledger-failed")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "记录流水失败"})
+			return
+		}
+	}
+	db.DB.Model(&ch).Update("analysis_status", "analyzing")
+	db.DB.Where("chapter_id = ?", chapterID).Delete(&db.NovelPlot{})
+
+	go func(chapterID, userID uint64, credits int, content string) {
+		status := "ready"
+		res, err := novel.AnalyzeChapter(content)
+		if err != nil {
+			status = "failed"
+			log.Printf("[Novel] 解析失败 [章节:%d]: %v", chapterID, err)
+			if credits > 0 {
+				refundCredits(userID, credits, "novel-analyze-failed")
+			}
+		} else {
+			plots := make([]db.NovelPlot, 0, len(res.Plots))
+			for i, p := range res.Plots {
+				plots = append(plots, db.NovelPlot{
+					ChapterID: chapterID,
+					PlotIndex: i + 1,
+					Title:     p.Title,
+					Summary:   p.Summary,
+				})
+			}
+			if err := db.DB.Create(&plots).Error; err != nil {
+				status = "failed"
+				log.Printf("[Novel] 情节保存失败 [章节:%d]: %v", chapterID, err)
+				if credits > 0 {
+					refundCredits(userID, credits, "novel-analyze-save-failed")
+				}
+			} else {
+				db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).Updates(map[string]interface{}{
+					"outline":    res.Outline,
+					"characters": res.Characters,
+					"scenes":     res.Scenes,
+				})
+			}
+		}
+		db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).
+			Updates(map[string]interface{}{"analysis_status": status, "updated_at": time.Now()})
+	}(chapterID, userID, credits, ch.Content)
+
+	c.JSON(http.StatusOK, gin.H{"status": "analyzing"})
+}
+
+// GetChapterDetail GET /api/novel/chapters/:id
+func GetChapterDetail(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	chapterID := parseUintParam(c.Param("id"))
+	var ch db.NovelChapter
+	if err := db.DB.First(&ch, chapterID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "章节不存在"})
+		return
+	}
+	var n db.Novel
+	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	var plots []db.NovelPlot
+	db.DB.Where("chapter_id = ?", chapterID).Order("plot_index ASC").Find(&plots)
+	c.JSON(http.StatusOK, gin.H{
+		"chapter": ch,
+		"plots":   plots,
+	})
+}

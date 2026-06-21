@@ -156,6 +156,8 @@ func main() {
 			novelGroup.DELETE("/:id", api.DeleteNovel)
 			novelGroup.POST("/chapters/:id/storyboard", api.TriggerStoryboard)
 			novelGroup.GET("/chapters/:id/storyboard", api.GetStoryboard)
+			novelGroup.POST("/chapters/:id/analyze", api.AnalyzeChapterHandler)
+			novelGroup.GET("/chapters/:id", api.GetChapterDetail)
 			novelGroup.PUT("/shots/:id", api.UpdateShot)
 		}
 

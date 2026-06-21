@@ -21,6 +21,9 @@ type NovelChapter struct {
 	Title            string    `gorm:"type:varchar(200)" json:"title"`
 	Content          string    `gorm:"type:longtext" json:"content"`
 	Outline          string    `gorm:"type:text" json:"outline"`
+	Characters       string    `gorm:"type:text" json:"characters"`
+	Scenes           string    `gorm:"type:text" json:"scenes"`
+	AnalysisStatus   string    `gorm:"type:varchar(20);default:'none'" json:"analysis_status"`
 	StoryboardStatus string    `gorm:"type:varchar(20);default:'none'" json:"storyboard_status"`
 	CreatedAt        time.Time `gorm:"type:datetime" json:"created_at"`
 	UpdatedAt        time.Time `gorm:"type:datetime" json:"updated_at"`
@@ -29,6 +32,7 @@ type NovelChapter struct {
 type NovelShot struct {
 	ID         uint64    `gorm:"primaryKey" json:"id"`
 	ChapterID  uint64    `gorm:"type:bigint;index;not null" json:"chapter_id"`
+	PlotID     uint64    `gorm:"type:bigint;index" json:"plot_id"`
 	ShotIndex  int       `gorm:"type:int;not null" json:"shot_index"`
 	Scene      string    `gorm:"type:varchar(1000)" json:"scene"`
 	Characters string    `gorm:"type:varchar(500)" json:"characters"`
@@ -39,4 +43,14 @@ type NovelShot struct {
 	VideoURL   string    `gorm:"type:varchar(500)" json:"video_url"`
 	CreatedAt  time.Time `gorm:"type:datetime" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"type:datetime" json:"updated_at"`
+}
+
+// NovelPlot 是一章里的一个情节（v2：情节层，分镜后续将挂到 plot）。
+type NovelPlot struct {
+	ID        uint64    `gorm:"primaryKey" json:"id"`
+	ChapterID uint64    `gorm:"type:bigint;index;not null" json:"chapter_id"`
+	PlotIndex int       `gorm:"type:int;not null" json:"plot_index"`
+	Title     string    `gorm:"type:varchar(200)" json:"title"`
+	Summary   string    `gorm:"type:varchar(1000)" json:"summary"`
+	CreatedAt time.Time `gorm:"type:datetime" json:"created_at"`
 }

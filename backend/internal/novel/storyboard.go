@@ -71,3 +71,60 @@ func parseStoryboardJSON(raw string) (*StoryboardResult, error) {
 	}
 	return &res, nil
 }
+
+// Plot 是一章里的一个情节。
+type Plot struct {
+	Title   string `json:"title"`
+	Summary string `json:"summary"`
+}
+
+// Analysis 是一章的解析结果。
+type Analysis struct {
+	Outline    string `json:"outline"`
+	Characters string `json:"characters"`
+	Scenes     string `json:"scenes"`
+	Plots      []Plot `json:"plots"`
+}
+
+const analyzeSystemPrompt = `你是一名资深小说编辑兼影视策划。我会给你一章小说正文，请分析并返回 JSON：
+{"outline":"本章大纲（100~200字，概括主要情节）","characters":"出场人物画像，每个一行格式 '姓名：简短描述（外貌/身份/性格）'","scenes":"本章关键场景/地点描述，每个一行","plots":[{"title":"情节标题","summary":"该情节简述（50~100字）"}]}
+要求：plots 按本章主要情节切分（通常 2~5 个），覆盖整章脉络。只返回 JSON，不要解释。`
+
+// AnalyzeChapter 解析一章：大纲 + 人物画像 + 场景 + 情节列表。
+func AnalyzeChapter(chapterContent string) (*Analysis, error) {
+	maxChars := config.GetNovelChapterMaxChars()
+	content := chapterContent
+	if len([]rune(content)) > maxChars {
+		content = string([]rune(content)[:maxChars])
+	}
+	model := config.GetNovelLLMModel()
+	raw, err := RelayChat(model, analyzeSystemPrompt, content)
+	if err != nil {
+		return nil, err
+	}
+	return parseAnalysisJSON(raw)
+}
+
+// parseAnalysisJSON 解析 LLM 返回的 Analysis（兼容裸 JSON / ```json 代码块）。
+func parseAnalysisJSON(raw string) (*Analysis, error) {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "```") {
+		raw = strings.TrimPrefix(raw, "```json")
+		raw = strings.TrimPrefix(raw, "```")
+		raw = strings.TrimSuffix(raw, "```")
+		raw = strings.TrimSpace(raw)
+	}
+	if !strings.HasPrefix(raw, "{") {
+		if m := jsonShotRe.FindString(raw); m != "" {
+			raw = m
+		}
+	}
+	var a Analysis
+	if err := json.Unmarshal([]byte(raw), &a); err != nil {
+		return nil, fmt.Errorf("解析 JSON 失败: %v (raw: %s)", err, truncate(raw, 200))
+	}
+	if len(a.Plots) == 0 {
+		return nil, fmt.Errorf("LLM 未返回情节列表")
+	}
+	return &a, nil
+}
