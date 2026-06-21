@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Veo 视频生成 API 文档</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2e3a;
+    --text: #e4e7ee;
+    --muted: #9aa3b2;
+    --accent: #6366f1;
+    --accent-soft: #6366f120;
+    --code-bg: #11131a;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 {
+    font-size: 2rem;
+    margin: 0 0 8px;
+    background: linear-gradient(135deg, #818cf8, #34d399);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: var(--muted); margin: 0 0 40px; font-size: 1.05rem; }
+  h2 {
+    font-size: 1.4rem;
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.1rem; margin: 28px 0 12px; color: var(--blue); }
+  p { color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    background: var(--accent-soft);
+    color: #a5b4fc;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  pre code {
+    background: none;
+    color: #cbd5e1;
+    padding: 0;
+    font-size: 0.86rem;
+    line-height: 1.6;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.92rem;
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  th { background: #20242f; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .badge.get { background: #34d39922; color: var(--green); }
+  .badge.post { background: #60a5fa22; color: var(--blue); }
+  .flow {
+    background: var(--code-bg);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-family: monospace;
+    color: var(--muted);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .req { color: var(--red); font-weight: 600; }
+  .opt { color: var(--muted); }
+  .note {
+    background: #fbbf2415;
+    border: 1px solid #fbbf2440;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #fde68a;
+    font-size: 0.9rem;
+    margin: 16px 0;
+  }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin: 0 0 40px;
+  }
+  .toc ul { margin: 0; padding-left: 20px; columns: 2; }
+  .toc li { margin: 4px 0; }
+  .tabs { display: flex; gap: 8px; margin-bottom: -1px; flex-wrap: wrap; }
+  .tab {
+    padding: 8px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .tab.active { color: var(--text); background: var(--code-bg); }
+  .status-pill { font-weight: 600; }
+  .status-pill.q { color: var(--muted); }
+  .status-pill.p { color: var(--blue); }
+  .status-pill.c { color: var(--green); }
+  .status-pill.f { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Veo 视频生成 API</h1>
+  <p class="subtitle">
+    Google Veo 模型，支持文生视频、首尾帧模式和多图参考模式，异步提交 + 轮询查询。
+  </p>
+
+  <div class="toc">
+    <strong>目录</strong>
+    <ul>
+      <li><a href="#quickstart">快速开始</a></li>
+      <li><a href="#models">可用模型</a></li>
+      <li><a href="#naming">命名规则</a></li>
+      <li><a href="#guide">模型选择指南</a></li>
+      <li><a href="#common">通用说明</a></li>
+      <li><a href="#submit">提交任务</a></li>
+      <li><a href="#query">查询任务</a></li>
+      <li><a href="#example">完整调用示例</a></li>
+      <li><a href="#cheatsheet">使用场景速查</a></li>
+    </ul>
+  </div>
+
+  <h2 id="quickstart">快速开始</h2>
+  <pre><code># 1. 提交任务（JSON 方式）
+curl -X POST https://apiai-tudou.net/v1/videos \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "veo_3_1",
+    "prompt": "一只可爱的小猫在花园里玩耍",
+    "size": "1280x720"
+  }'
+
+# 2. 轮询结果
+curl https://apiai-tudou.net/v1/videos/{task_id} \
+  -H "Authorization: Bearer $API_KEY"</code></pre>
+
+  <h2 id="models">可用模型</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>模型</th><th>模式</th><th>速度</th><th>画质</th><th>图片数量</th><th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>veo_3_1</code></td><td>多图参考</td><td>标准</td><td>标准</td><td>0 或 1~3</td><td>基础参考图 / 文生视频</td></tr>
+      <tr><td><code>veo_3_1-hd</code></td><td>多图参考</td><td>标准</td><td>高清</td><td>0 或 1~3</td><td>参考图模式的高清版</td></tr>
+      <tr><td><code>veo_3_1-fl</code></td><td>首尾帧</td><td>标准</td><td>标准</td><td>1~2</td><td>首尾帧模式，1 张 = 仅首帧，2 张 = 首尾帧</td></tr>
+      <tr><td><code>veo_3_1-hd-fl</code></td><td>首尾帧</td><td>标准</td><td>高清</td><td>1~2</td><td>首尾帧模式的高清版</td></tr>
+      <tr><td><code>veo_3_1-fast-fl</code></td><td>首尾帧</td><td>快速</td><td>标准</td><td>1~2</td><td>首尾帧模式的快速版</td></tr>
+      <tr><td><code>veo_3_1-fast-fl-hd</code></td><td>首尾帧</td><td>快速</td><td>高清</td><td>1~2</td><td>首尾帧模式的快速高清版</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="naming">命名规则</h2>
+  <p>模型名由 <code>veo_3_1</code> 加可选后缀组合而成：</p>
+  <table>
+    <thead><tr><th>后缀</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>（无后缀）</td><td>标准速度、标准画质</td></tr>
+      <tr><td><code>-hd</code></td><td>高清画质</td></tr>
+      <tr><td><code>-fl</code></td><td>首尾帧模式（first / last frame），需传入 1~2 张图作为首帧和尾帧</td></tr>
+      <tr><td><code>-fast-fl</code></td><td>快速 + 首尾帧模式</td></tr>
+      <tr><td><code>-fast-fl-hd</code></td><td>快速 + 首尾帧 + 高清画质</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    不含 <code>-fl</code> 的模型（<code>veo_3_1</code> / <code>veo_3_1-hd</code>）为多图参考模式，
+    可传 1~3 张参考图引导视频风格，不传图时即为文生视频。
+  </div>
+
+  <h2 id="guide">模型选择指南</h2>
+  <div class="card">
+    <ul>
+      <li><strong>文生视频</strong>：选非 <code>-fl</code> 模型（如 <code>veo_3_1</code>），不传图片字段</li>
+      <li><strong>参考图模式（图生视频）</strong>：选非 <code>-fl</code> 模型，传 1~3 张参考图</li>
+      <li><strong>首尾帧模式（图生视频）</strong>：选 <code>-fl</code> 结尾的模型，传 1~2 张图</li>
+      <li><strong>追求速度</strong>：选带 <code>-fast</code> 的模型</li>
+      <li><strong>追求画质</strong>：选带 <code>-hd</code> 的模型</li>
+    </ul>
+  </div>
+
+  <h2 id="common">通用说明</h2>
+
+  <h3>端点</h3>
+  <table>
+    <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge post">POST</span></td><td><code>/v1/videos</code></td><td>提交视频生成任务</td></tr>
+      <tr><td><span class="badge get">GET</span></td><td><code>/v1/videos/{task_id}</code></td><td>查询任务状态</td></tr>
+    </tbody>
+  </table>
+
+  <h3>请求头</h3>
+  <table>
+    <thead><tr><th>参数</th><th>值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>Authorization</td><td><code>Bearer YOUR_API_KEY</code></td><td>必填</td></tr>
+      <tr><td>Content-Type</td><td><code>application/json</code> 或 <code>multipart/form-data</code></td><td>POST 时必填</td></tr>
+    </tbody>
+  </table>
+
+  <h3>请求参数</h3>
+  <table>
+    <thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>model</code></td><td>string</td><td class="req">是</td><td>模型名称，详见 <a href="#models">可用模型</a></td></tr>
+      <tr><td><code>prompt</code></td><td>string</td><td class="req">是</td><td>文本提示词</td></tr>
+      <tr><td><code>size</code></td><td>string</td><td class="opt">否</td><td>视频尺寸，如 <code>1280x720</code>（横屏）、<code>720x1280</code>（竖屏）</td></tr>
+      <tr><td><code>images</code></td><td>string[]</td><td class="opt">否</td><td>参考图 URL 数组，最多 3 张（JSON 方式使用此字段）</td></tr>
+      <tr><td><code>input_reference[]</code></td><td>可重复</td><td class="opt">否</td><td>参考图 URL，最多 3 张（表单方式使用此字段，同一字段名可重复多次）</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    JSON 与表单二选一即可。文生视频时不传图片字段。<br />
+    <strong>图片顺序约定：</strong>首尾帧模式 — 第 1 张为首帧，第 2 张为尾帧（仅 1 张时只指定首帧）；
+    参考图模式 — 最多 3 张，顺序为参考图 1、2、3。
+  </div>
+
+  <h3>响应参数</h3>
+  <table>
+    <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>string</td><td>任务 ID</td></tr>
+      <tr><td><code>status</code></td><td>string</td><td><code>queued</code> / <code>processing</code> / <code>completed</code> / <code>failed</code></td></tr>
+      <tr><td><code>progress</code></td><td>number</td><td>进度 0~100</td></tr>
+      <tr><td><code>video_url</code></td><td>string</td><td>视频直链（仅 completed 时返回）</td></tr>
+      <tr><td><code>error</code></td><td>object</td><td>错误信息（仅 failed 时返回），含 message、code</td></tr>
+    </tbody>
+  </table>
+
+  <h3>状态流转</h3>
+  <div class="flow">queued → processing → completed
+                   ↘ failed</div>
+
+  <h2 id="submit">提交任务</h2>
+
+  <h3>JSON 方式（推荐）</h3>
+  <pre><code>curl -X POST "https://apiai-tudou.net/v1/videos" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "veo_3_1-fl",
+    "prompt": "广告",
+    "size": "1280x720",
+    "images": [
+      "https://example.com/first.png",
+      "https://example.com/second.jpg"
+    ]
+  }'</code></pre>
+
+  <h3>表单方式</h3>
+  <pre><code>curl -X POST "https://apiai-tudou.net/v1/videos" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "model=veo_3_1-fast-fl" \
+  -F "prompt=广告" \
+  -F "size=1280x720" \
+  -F "input_reference[]=https://example.com/first.png" \
+  -F "input_reference[]=https://example.com/second.jpg"</code></pre>
+
+  <h3>提交响应示例</h3>
+  <pre><code>{
+  "id": "task_xxxxxxxxxxxxx",
+  "object": "video",
+  "model": "veo_3_1",
+  "status": "queued",
+  "progress": 0,
+  "created_at": 1709876543,
+  "size": "1920x1080"
+}</code></pre>
+
+  <h2 id="query">查询任务</h2>
+  <p><span class="badge get">GET</span> <code>/v1/videos/{task_id}</code></p>
+  <pre><code>curl "https://apiai-tudou.net/v1/videos/task_xxxxxxxxxxxxx" \
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+
+  <h3>进行中响应</h3>
+  <pre><code>{
+  "id": "task_xxxxxxxxxxxxx",
+  "object": "video",
+  "model": "veo_3_1",
+  "status": "processing",
+  "progress": 45,
+  "created_at": 1709876543,
+  "size": "1920x1080"
+}</code></pre>
+
+  <h3>完成响应</h3>
+  <pre><code>{
+  "id": "task_xxxxxxxxxxxxx",
+  "object": "video",
+  "model": "veo_3_1",
+  "status": "completed",
+  "progress": 100,
+  "created_at": 1709876543,
+  "completed_at": 1709876600,
+  "size": "1920x1080",
+  "video_url": "https://img.12ai.org/videos/task_xxxxxxxxxxxxx.mp4"
+}</code></pre>
+
+  <h3>失败响应</h3>
+  <pre><code>{
+  "id": "task_xxxxxxxxxxxxx",
+  "object": "video",
+  "model": "veo_3_1",
+  "status": "failed",
+  "error": {
+    "message": "内容安全策略拦截",
+    "code": "content_filter"
+  }
+}</code></pre>
+
+  <h2 id="example">完整调用示例</h2>
+  <h3>Python（JSON 方式）</h3>
+  <pre><code>import requests
+import time
+
+API_BASE = "https://apiai-tudou.net"
+API_KEY = "YOUR_API_KEY"
+HEADERS = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json",
+}
+
+# 1. 提交任务
+resp = requests.post(
+    f"{API_BASE}/v1/videos",
+    headers=HEADERS,
+    json={
+        "model": "veo_3_1",
+        "prompt": "一只可爱的小猫在阳光下玩耍，电影级画质",
+        "size": "1280x720",
+    },
+)
+task = resp.json()
+task_id = task["id"]
+print(f"任务已创建: {task_id}")
+
+# 2. 轮询状态
+while True:
+    resp = requests.get(
+        f"{API_BASE}/v1/videos/{task_id}",
+        headers={"Authorization": f"Bearer {API_KEY}"},
+    )
+    data = resp.json()
+    status = data["status"]
+    progress = data.get("progress", 0)
+    print(f"状态: {status}, 进度: {progress}%")
+
+    if status == "completed":
+        print(f"生成成功！视频地址: {data['video_url']}")
+        break
+    elif status == "failed":
+        print(f"生成失败: {data['error']['message']}")
+        break
+
+    time.sleep(5)</code></pre>
+
+  <h2 id="cheatsheet">使用场景速查</h2>
+  <table>
+    <thead><tr><th>场景</th><th>推荐模型</th><th>图片数量</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>文生视频</td><td><code>veo_3_1</code></td><td>0（不传）</td><td>纯文本描述生成视频</td></tr>
+      <tr><td>参考图（标准）</td><td><code>veo_3_1</code></td><td>1~3</td><td>参考图引导视频风格</td></tr>
+      <tr><td>参考图（高清）</td><td><code>veo_3_1-hd</code></td><td>1~3</td><td>参考图 + 高清画质</td></tr>
+      <tr><td>首尾帧（标准）</td><td><code>veo_3_1-fl</code></td><td>1~2</td><td>首帧 + 可选尾帧</td></tr>
+      <tr><td>首尾帧（高清）</td><td><code>veo_3_1-hd-fl</code></td><td>1~2</td><td>首尾帧 + 高清画质</td></tr>
+      <tr><td>首尾帧（快速）</td><td><code>veo_3_1-fast-fl</code></td><td>1~2</td><td>首尾帧 + 快速生成</td></tr>
+      <tr><td>首尾帧（快速高清）</td><td><code>veo_3_1-fast-fl-hd</code></td><td>1~2</td><td>首尾帧 + 快速 + 高清</td></tr>
+    </tbody>
+  </table>
+
+</div>
+</body>
+</html>
