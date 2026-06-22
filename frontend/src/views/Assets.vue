@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { NEmpty, NPopover, useMessage } from 'naive-ui'
 import { useGenerationStore } from '../stores/generation'
+import { useNovelStore } from '../stores/novel'
 import { useUserStore } from '../stores/user'
 import { useInspiration } from '../composables/useInspiration'
 import ShareGenerationDialog from '../components/ShareGenerationDialog.vue'
@@ -11,12 +12,14 @@ import ShareGenerationDialog from '../components/ShareGenerationDialog.vue'
 const { t } = useI18n()
 const router = useRouter()
 const genStore = useGenerationStore()
+const novelStore = useNovelStore()
 const userStore = useUserStore()
 const { shareGeneration, unshareInspiration, listLikedInspirations, listMyInspirations, unlikeInspiration, publishInspiration } = useInspiration()
 const message = useMessage()
 
 const typeFilter = ref('all')
 const subFilter = ref('all')
+const activeNovel = ref(null)
 const likedPosts = ref([])
 const likedLoading = ref(false)
 const likedLoadingMore = ref(false)
@@ -44,6 +47,9 @@ onMounted(() => {
   if (genStore.filters.shared) subFilter.value = 'shared'
   else if (genStore.filters.favorite) subFilter.value = 'favorite'
   else subFilter.value = 'all'
+  activeNovel.value = genStore.filters.novelId ?? null
+  // 加载小说列表用于小说资产筛选（忽略错误，不影响主流程）
+  novelStore.loadNovels().catch(() => {})
   if (subFilter.value === 'liked') {
     loadLiked(true)
   } else if (subFilter.value === 'shared') {
@@ -79,6 +85,11 @@ const setSubFilter = async (sub) => {
   } else {
     await genStore.setFilters({ type: typeFilter.value, favorite: false, shared: false })
   }
+}
+
+const setNovelFilter = async (value) => {
+  activeNovel.value = value
+  await genStore.setFilters({ novelId: value, offset: 0 })
 }
 
 const buildTimelineGroups = (items, timeField) => {
@@ -405,6 +416,17 @@ const handleScroll = (e) => {
         <button :class="['filter-chip', { active: subFilter === 'liked' }]" @click="setSubFilter('liked')">{{ $t('assets.myLikes') }}</button>
         <button v-if="subFilter === 'shared'" class="publish-btn" @click="openPublishDialog">{{ t('inspiration.publishAction') }}</button>
       </div>
+      <div class="filter-row novel-row">
+        <span class="novel-row-label">小说资产</span>
+        <button :class="['filter-chip', { active: activeNovel == null }]" @click="setNovelFilter(null)">📖 全部作品</button>
+        <button :class="['filter-chip', { active: activeNovel === 'public' }]" @click="setNovelFilter('public')">🌍 公共池</button>
+        <button
+          v-for="novel in novelStore.novels"
+          :key="novel.id"
+          :class="['filter-chip', { active: activeNovel === novel.id }]"
+          @click="setNovelFilter(novel.id)"
+        >📖 {{ novel.title }}</button>
+      </div>
     </div>
     <!-- Assets grid -->
     <div class="assets-scroll" @scroll="handleScroll">
@@ -662,6 +684,19 @@ const handleScroll = (e) => {
 
 .sub-row {
   align-items: center;
+}
+
+.novel-row {
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.novel-row-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding-right: 4px;
 }
 
 .publish-btn {

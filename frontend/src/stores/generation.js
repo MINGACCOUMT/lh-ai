@@ -20,6 +20,7 @@ export const useGenerationStore = defineStore('generation', () => {
     type: 'all',
     favorite: false,
     shared: false,
+    novelId: null,
     limit: 20,
     offset: 0
   })
@@ -37,6 +38,9 @@ export const useGenerationStore = defineStore('generation', () => {
         shared: filters.value.shared,
         limit: filters.value.limit,
         offset: filters.value.offset
+      }
+      if (filters.value.novelId != null && filters.value.novelId !== '') {
+        params.novel_id = filters.value.novelId
       }
       const { data } = await api.get('/generations', { params })
 
@@ -156,6 +160,7 @@ export const useGenerationStore = defineStore('generation', () => {
       type: 'all',
       favorite: false,
       shared: false,
+      novelId: null,
       limit: 20,
       offset: 0
     }

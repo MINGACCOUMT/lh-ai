@@ -92,6 +92,16 @@ func ListGenerations(c *gin.Context) {
 		)
 	}
 
+	// 小说资产筛选
+	novelFilter := c.Query("novel_id")
+	if novelFilter == "public" {
+		query = query.Where("generations.novel_id IS NULL AND generations.novel_asset_type IS NOT NULL")
+	} else if novelFilter != "" && novelFilter != "all" {
+		if nid := parseUintParam(novelFilter); nid > 0 {
+			query = query.Where("generations.novel_id = ?", nid)
+		}
+	}
+
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to query generations"})
