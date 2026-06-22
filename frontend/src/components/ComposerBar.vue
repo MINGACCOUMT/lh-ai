@@ -6,6 +6,7 @@ import { useUserStore } from '../stores/user'
 import { useGenerate } from '../composables/useGenerate'
 import { usePricingStore } from '../stores/pricing'
 import { useModelsStore } from '../stores/models'
+import AssetPicker from './AssetPicker.vue'
 
 const { t } = useI18n()
 
@@ -35,6 +36,20 @@ const optimizePrimary = ref(null)
 
 const optimizeBackupPrompt = ref('')
 const optimizeRequestId = ref(0)  // 用于防重复请求
+
+// --- AssetPicker (works library) ---
+const showAssetPicker = ref(false)
+const onAssetPickerConfirm = (urls) => {
+  const list = Array.isArray(urls) ? urls : [urls]
+  for (const url of list) {
+    if (!url) continue
+    if (uploadedImageUrls.value.length >= 3) break
+    if (uploadedImageUrls.value.includes(url)) continue
+    // 素材库图片已经是 OSS URL，直接作为预览和 URL 使用
+    uploadedImagePreviews.value.push(url)
+    uploadedImageUrls.value.push(url)
+  }
+}
 
 // --- Prompt Optimize Style ---
 const selectedOptimizeStyle = ref('balanced')
@@ -627,6 +642,15 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
               <span class="frame-lbl">{{ creativeMode === 'ecommerce' ? $t('composer.productImage') : $t('composer.refImage') }}</span>
             </div>
           </label>
+          <!-- 从素材库选择 -->
+          <button v-if="uploadedImageUrls.length < 3 && (uploadedImagePreviews.length <= 1 || uploadsExpanded)"
+            type="button" class="upload-card asset-pick-btn" :style="{ '--tilt': uploadedImagePreviews.length === 0 ? '3deg' : '-4deg' }"
+            @click="showAssetPicker = true" title="从素材库选择">
+            <div class="frame-placeholder">
+              <span class="add-icon">🖼</span>
+              <span class="frame-lbl">素材库</span>
+            </div>
+          </button>
           <!-- 展开态收起按钮 -->
           <button v-if="uploadsExpanded && uploadedImagePreviews.length >= 2"
             class="stack-collapse-btn" @click="uploadsExpanded = false" title="收起">−</button>
@@ -876,6 +900,14 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
         </template>
       </div>
     </div>
+
+    <!-- 从素材库选择参考图 -->
+    <AssetPicker
+      v-model:show="showAssetPicker"
+      mode="multi"
+      :exclude-urls="uploadedImageUrls"
+      @confirm="onAssetPickerConfirm"
+    />
   </div>
 </template>
 
@@ -1038,6 +1070,9 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
 .stack-collapse-btn:hover { background: var(--color-tint-white-10); color: var(--color-text-primary); }
 
 .add-icon { font-size: 22px; color: var(--color-text-muted); font-weight: 300; line-height: 1; }
+.asset-pick-btn {
+  padding: 0; border: none; background: transparent; cursor: pointer; font-family: inherit;
+}
 .card-remove {
   position: absolute; top: -7px; right: -7px; z-index: 2;
   width: 20px; height: 20px; border-radius: 50%;
