@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<!-- saved from url=(0051)https://docs.ai-tudou.net/veo31-video-api-docs.html -->
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veo3.1 视频生成 API 文档（土豆 API）</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2e3a;
+    --text: #e4e7ee;
+    --muted: #9aa3b2;
+    --accent: #6366f1;
+    --accent-soft: #6366f120;
+    --code-bg: #11131a;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 {
+    font-size: 2rem;
+    margin: 0 0 8px;
+    background: linear-gradient(135deg, #818cf8, #34d399);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: var(--muted); margin: 0 0 40px; font-size: 1.05rem; }
+  h2 {
+    font-size: 1.4rem;
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.1rem; margin: 28px 0 12px; color: var(--blue); }
+  p { color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    background: var(--accent-soft);
+    color: #a5b4fc;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  pre code {
+    background: none;
+    color: #cbd5e1;
+    padding: 0;
+    font-size: 0.86rem;
+    line-height: 1.6;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.92rem;
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  th { background: #20242f; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .badge.get { background: #34d39922; color: var(--green); }
+  .badge.post { background: #60a5fa22; color: var(--blue); }
+  .flow {
+    background: var(--code-bg);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-family: monospace;
+    color: var(--muted);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .req { color: var(--red); font-weight: 600; }
+  .opt { color: var(--muted); }
+  .note {
+    background: #fbbf2415;
+    border: 1px solid #fbbf2440;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #fde68a;
+    font-size: 0.9rem;
+    margin: 16px 0;
+  }
+  .info {
+    background: #6366f115;
+    border: 1px solid #6366f140;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #a5b4fc;
+    font-size: 0.9rem;
+    margin: 16px 0;
+  }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin: 0 0 40px;
+  }
+  .toc ul { margin: 0; padding-left: 20px; columns: 2; }
+  .toc li { margin: 4px 0; }
+  .status-pill { font-weight: 600; }
+  .status-pill.q { color: var(--muted); }
+  .status-pill.p { color: var(--blue); }
+  .status-pill.c { color: var(--green); }
+  .status-pill.f { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Veo3.1 视频生成 API（土豆 API）</h1>
+  <p class="subtitle">
+    Google Veo3.1 引擎，支持文生视频与图生视频，可选 720p / 1080p 分辨率，最多 3 张参考图。异步任务模式，提交后轮询查询状态，完成后直接获取视频 URL。
+  </p>
+
+  <div class="toc">
+    <strong>目录</strong>
+    <ul>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#quickstart">快速开始</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#auth">认证</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#models">可用模型</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#params">通用参数</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#submit">提交视频任务</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#i2v">图生视频</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#multiref">多图参考模式</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#query">查询 &amp; 下载</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#example">完整调用示例</a></li>
+      <li><a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#errors">错误码</a></li>
+    </ul>
+  </div>
+
+  <h2 id="quickstart">快速开始</h2>
+  <pre><code># 1. 提交文生视频任务（JSON body）
+curl -X POST https://api.ai-tudou.net/v1/videos/generations \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"veo3.1-720p","prompt":"一只橘猫在阳光草地上追蝴蝶，温暖治愈","duration":4,"aspect_ratio":"9:16","resolution":"720p"}'
+
+# 2. 轮询任务状态（task_id 为上一步返回 data.id）
+curl https://api.ai-tudou.net/v1/tasks/TASK_ID \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# 3. 任务 completed 后，直接从 data.result.video_url 下载视频
+curl -L "VIDEO_URL" -o out.mp4</code></pre>
+
+  <div class="info">
+    基址：<code>https://api.ai-tudou.net</code>。提交端点为 <code>/v1/videos/generations</code>，轮询端点为 <code>/v1/tasks/{task_id}</code>。请求体为 JSON（<code>application/json</code>），不是 multipart 表单。
+  </div>
+
+  <h2 id="auth">认证</h2>
+  <p>所有接口均需在请求头携带 API Key：</p>
+  <pre><code>Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json</code></pre>
+
+  <h2 id="models">可用模型</h2>
+  <table>
+    <thead><tr><th>模型名</th><th>分辨率</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>veo3.1-720p</code></td><td>720p</td><td>720p 入口，出片分辨率固定为 720p</td></tr>
+      <tr><td><code>veo3.1-1080p</code></td><td>1080p</td><td>1080p 入口，出片分辨率固定为 1080p</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>模型名后缀即分辨率，一一对应，不可覆盖。</strong>
+    <ul style="margin:8px 0 0; padding-left:20px;">
+      <li>请求 <code>veo3.1-720p</code> 时，<code>resolution</code> 参数必须传 <code>"720p"</code>；</li>
+      <li>请求 <code>veo3.1-1080p</code> 时，<code>resolution</code> 参数必须传 <code>"1080p"</code>；</li>
+      <li>后缀与 <code>resolution</code> 不一致会被渠道拒绝。</li>
+    </ul>
+  </div>
+
+  <h3>参数取值</h3>
+  <table>
+    <thead><tr><th>参数</th><th>取值</th><th>默认</th></tr></thead>
+    <tbody>
+      <tr><td><code>duration</code></td><td><code>4</code> / <code>6</code> / <code>8</code>（秒）</td><td><code>8</code></td></tr>
+      <tr><td><code>aspect_ratio</code></td><td><code>16:9</code> / <code>9:16</code></td><td><code>16:9</code></td></tr>
+      <tr><td><code>resolution</code></td><td><code>720p</code> / <code>1080p</code></td><td>由模型名后缀决定，必须与后缀一致</td></tr>
+      <tr><td><code>reference_mode</code></td><td><code>frame</code> / <code>image</code></td><td><code>frame</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>渠道需先加入对应模型名</strong>。在土豆 API 的渠道配置里把你要用的模型名（<code>veo3.1-720p</code> / <code>veo3.1-1080p</code>）加入模型列表，否则会返回「分组下模型 xxx 无可用渠道」。
+  </div>
+
+  <h2 id="params">通用参数</h2>
+  <table>
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>必填</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>model</code></td><td>string</td><td>—</td><td class="req">是</td><td>填 <code>veo3.1-720p</code> 或 <code>veo3.1-1080p</code></td></tr>
+      <tr><td><code>prompt</code></td><td>string</td><td>—</td><td class="req">是</td><td>视频描述文本</td></tr>
+      <tr><td><code>resolution</code></td><td>string</td><td>—</td><td class="req">是</td><td>分辨率，必须与模型名后缀一致（<code>720p</code> / <code>1080p</code>）</td></tr>
+      <tr><td><code>duration</code></td><td>int</td><td>8</td><td class="opt">否</td><td>时长（秒）：<code>4</code> / <code>6</code> / <code>8</code>，越界自动夹紧到最近合法值</td></tr>
+      <tr><td><code>aspect_ratio</code></td><td>string</td><td>16:9</td><td class="opt">否</td><td>比例：<code>16:9</code>（横屏）/ <code>9:16</code>（竖屏）</td></tr>
+      <tr><td><code>images</code></td><td>string[]</td><td>—</td><td class="opt">否</td><td>图生视频参考图 URL 数组；<code>frame</code> 模式最多 <strong>2</strong> 张，<code>image</code> 模式最多 <strong>3</strong> 张</td></tr>
+      <tr><td><code>reference_mode</code></td><td>string</td><td>frame</td><td class="opt">否</td><td>参考模式：<code>frame</code>（首尾帧引导）/ <code>image</code>（多图风格参考，最多 3 张），详见 <a href="https://docs.ai-tudou.net/veo31-video-api-docs.html#multiref">多图参考模式</a></td></tr>
+      <tr><td><code>generate_audio</code></td><td>bool</td><td>true</td><td class="opt">否</td><td>是否生成音频</td></tr>
+      <tr><td><code>negative_prompt</code></td><td>string</td><td>—</td><td class="opt">否</td><td>负向提示词</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info">
+    除 <code>model</code> / <code>prompt</code> / <code>resolution</code> 外其余参数均可省略，服务端按默认值补齐。<code>images</code> 留空即文生视频，附上 URL 即图生视频。
+  </div>
+
+  <h2 id="submit">提交视频任务</h2>
+  <p>
+    <span class="badge post">POST</span> <code>/v1/videos/generations</code> &nbsp; <code>application/json</code>
+  </p>
+  <p>提交后立即返回任务 id，无需保持长连接，通过轮询获取结果。</p>
+
+  <h3>文生视频</h3>
+  <pre><code>curl -X POST https://api.ai-tudou.net/v1/videos/generations \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "veo3.1-1080p",
+    "prompt": "城市夜景延时，赛博朋克风格，流光溢彩",
+    "duration": 8,
+    "aspect_ratio": "16:9",
+    "resolution": "1080p"
+  }'</code></pre>
+
+  <h3>提交响应</h3>
+  <pre><code>{
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "id": "AbC123DeFgH"
+  }
+}</code></pre>
+  <div class="info">返回的 <code>data.id</code> 用于后续轮询查询。</div>
+
+  <h2 id="i2v">图生视频</h2>
+  <p>在请求体中加入 <code>images</code> 数组（图片 URL）即进入图生视频模式。默认 <code>frame</code> 模式最多 2 张，作为首尾帧引导生成。</p>
+
+  <pre><code>curl -X POST https://api.ai-tudou.net/v1/videos/generations \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "veo3.1-720p",
+    "prompt": "让画面动起来，加入微风与光影流动",
+    "duration": 4,
+    "aspect_ratio": "9:16",
+    "resolution": "720p",
+    "images": [
+      "https://cdn.phototourl.com/free/2026-06-22-f62848fd-53ae-4ce1-ac51-45da9386b60b.png"
+    ]
+  }'</code></pre>
+
+  <div class="note">
+    图片需为可公网访问的 URL。服务端会下载并上传到上游作为参考图，单张最大 10MB，超限或不可达会返回 400。
+  </div>
+
+  <h2 id="multiref">多图参考模式</h2>
+  <p>需要 3 张参考图、且希望成片更贴合输入图风格时，把 <code>reference_mode</code> 设为 <code>"image"</code>，<code>images</code> 最多可传 <strong>3</strong> 张。</p>
+
+  <table>
+    <thead><tr><th>reference_mode</th><th>语义</th><th>images 上限</th></tr></thead>
+    <tbody>
+      <tr><td><code>frame</code>（默认）</td><td>首尾帧引导动画，图作为视频的起点/终点</td><td>2 张</td></tr>
+      <tr><td><code>image</code></td><td>多图风格参考，成片更贴合输入图的风格与内容</td><td>3 张</td></tr>
+    </tbody>
+  </table>
+
+  <pre><code>curl -X POST https://api.ai-tudou.net/v1/videos/generations \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "veo3.1-1080p",
+    "prompt": "保持画面风格，让场景动起来，加入微风与光影流动",
+    "duration": 6,
+    "aspect_ratio": "16:9",
+    "resolution": "1080p",
+    "reference_mode": "image",
+    "images": [
+      "https://cdn.example.com/ref1.png",
+      "https://cdn.example.com/ref2.png",
+      "https://cdn.example.com/ref3.png"
+    ]
+  }'</code></pre>
+
+  <div class="info">
+    <code>reference_mode</code> 只在图生视频（<code>images</code> 非空）时生效；文生视频传不传都不影响结果。非法值会回落到 <code>frame</code>。
+  </div>
+
+  <h2 id="query">查询状态与下载</h2>
+
+  <h3>查询任务状态</h3>
+  <p><span class="badge get">GET</span> <code>/v1/tasks/{task_id}</code></p>
+  <pre><code>curl https://api.ai-tudou.net/v1/tasks/AbC123DeFgH \
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+
+  <h3>状态说明</h3>
+  <table>
+    <thead><tr><th>status</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><span class="status-pill q">submitted</span></td><td>已入队，等待处理</td></tr>
+      <tr><td><span class="status-pill p">processing</span></td><td>生成中，<code>progress</code> 字段为 0–100</td></tr>
+      <tr><td><span class="status-pill c">completed</span></td><td>完成，从 <code>data.result.video_url</code> 获取视频地址</td></tr>
+      <tr><td><span class="status-pill f">failed</span></td><td>失败，见 <code>data.error.message</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>状态流转</h3>
+  <div class="flow">submitted → processing → completed
+              ↘ failed</div>
+
+  <h3>查询响应示例（生成中）</h3>
+  <pre><code>{
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "id": "AbC123DeFgH",
+    "status": "processing",
+    "progress": 42
+  }
+}</code></pre>
+
+  <h3>查询响应示例（完成）</h3>
+  <pre><code>{
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "id": "AbC123DeFgH",
+    "status": "completed",
+    "progress": 100,
+    "result": {
+      "videos": [
+        { "url": ["https://cdn.example.com/out/AbC123DeFgH.mp4"] }
+      ],
+      "video_url": "https://cdn.example.com/out/AbC123DeFgH.mp4"
+    }
+  }
+}</code></pre>
+
+  <div class="info">
+    完成后无需额外的 <code>/content</code> 端点，<code>data.result.video_url</code> 即为可直接下载/播放的 MP4 地址。<code>data.result.videos[0].url</code> 是同一地址的数组形式，兼容旧客户端。
+  </div>
+
+  <div class="note">
+    建议提交后等待 10–20 秒再首次查询，之后每 5–10 秒轮询一次。4s/720p 视频通常 1–2 分钟内完成，8s/1080p 耗时更久。结果地址保留时间有限，请及时下载。
+  </div>
+
+  <h2 id="example">完整调用示例</h2>
+
+  <h3>curl — 一行提交（图生视频，9:16，4s，720p）</h3>
+  <pre><code>curl -s -X POST https://api.ai-tudou.net/v1/videos/generations -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d "{\"model\":\"veo3.1-720p\",\"prompt\":\"the scene comes alive with subtle cinematic motion\",\"images\":[\"https://cdn.phototourl.com/free/2026-06-22-f62848fd-53ae-4ce1-ac51-45da9386b60b.png\"],\"duration\":4,\"aspect_ratio\":\"9:16\",\"resolution\":\"720p\"}"</code></pre>
+
+  <h3>curl — 一行提交（多图参考，3 张，image 模式，1080p）</h3>
+  <pre><code>curl -s -X POST https://api.ai-tudou.net/v1/videos/generations -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d "{\"model\":\"veo3.1-1080p\",\"prompt\":\"keep the style, animate the scene\",\"reference_mode\":\"image\",\"images\":[\"https://cdn.example.com/ref1.png\",\"https://cdn.example.com/ref2.png\",\"https://cdn.example.com/ref3.png\"],\"duration\":6,\"aspect_ratio\":\"16:9\",\"resolution\":\"1080p\"}"</code></pre>
+
+  <h3>Python — 图生视频（异步轮询 + 下载）</h3>
+  <pre><code>import requests, time
+
+API_BASE = "https://api.ai-tudou.net"
+HEADERS  = {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type":  "application/json",
+}
+
+# 1. 提交任务
+resp = requests.post(
+    f"{API_BASE}/v1/videos/generations",
+    headers=HEADERS,
+    json={
+        "model":           "veo3.1-720p",
+        "prompt":          "让画面动起来，加入微风与光影流动",
+        "duration":        4,
+        "aspect_ratio":    "9:16",
+        "resolution":      "720p",
+        "reference_mode":  "image",
+        "images": [
+            "https://cdn.phototourl.com/free/2026-06-22-f62848fd-53ae-4ce1-ac51-45da9386b60b.png"
+        ],
+    },
+)
+task_id = resp.json()["data"]["id"]
+print(f"任务已提交: {task_id}")
+
+# 2. 等待首次查询
+time.sleep(15)
+
+# 3. 轮询状态
+while True:
+    r = requests.get(f"{API_BASE}/v1/tasks/{task_id}", headers=HEADERS)
+    data = r.json()["data"]
+    status   = data["status"]
+    progress = data.get("progress", 0)
+    print(f"状态: {status}  进度: {progress}%")
+
+    if status == "completed":
+        video_url = data["result"]["video_url"]
+        # 4. 下载视频
+        video = requests.get(video_url)
+        with open("output.mp4", "wb") as f:
+            f.write(video.content)
+        print("视频已保存: output.mp4")
+        break
+    elif status == "failed":
+        print(f"生成失败: {data.get('error')}")
+        break
+
+    time.sleep(8)</code></pre>
+
+  <h2 id="errors">错误码</h2>
+  <p>错误响应遵循 OpenAI 风格：</p>
+  <pre><code>{
+  "error": {
+    "message": "Invalid model: veo3.1-720p",
+    "type": "invalid_request_error"
+  }
+}</code></pre>
+  <table>
+    <thead><tr><th>HTTP 状态码</th><th>场景</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>400</td><td>参数错误 / 图片不可达 / 超限</td><td>模型名非法、<code>resolution</code> 与后缀不匹配、<code>images</code> 超过上限（frame 2 张 / image 3 张）、参考图下载失败等</td></tr>
+      <tr><td>401</td><td>鉴权失败</td><td>API Key 无效或渠道未启用</td></tr>
+      <tr><td>404</td><td>任务不存在</td><td>查询时 <code>task_id</code> 不存在，返回 <code>data.status = "failed"</code></td></tr>
+      <tr><td>5xx</td><td>服务异常</td><td>上游异常或内部错误，稍后重试</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info">
+    若返回「分组 xxx 下模型 veo3.1-720p 无可用渠道」，说明土豆 API 的渠道模型列表未加入 <code>veo3.1-720p</code>，去管理面板加上即可。
+  </div>
+
+</div>
+
+
+</body></html>
