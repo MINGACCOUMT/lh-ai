@@ -151,11 +151,13 @@ func GetNovel(c *gin.Context) {
 		ID               uint64 `json:"id"`
 		ChapterIndex     int    `json:"chapter_index"`
 		Title            string `json:"title"`
+		AnalysisStatus   string `json:"analysis_status"`
+		AssetsStatus     string `json:"assets_status"`
 		StoryboardStatus string `json:"storyboard_status"`
 	}
 	lite := make([]chLite, 0, len(chapters))
 	for _, ch := range chapters {
-		lite = append(lite, chLite{ch.ID, ch.ChapterIndex, ch.Title, ch.StoryboardStatus})
+		lite = append(lite, chLite{ch.ID, ch.ChapterIndex, ch.Title, ch.AnalysisStatus, ch.AssetsStatus, ch.StoryboardStatus})
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"novel":         n,

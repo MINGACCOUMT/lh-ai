@@ -29,18 +29,21 @@
           <div class="chapter-body">
             <p class="chapter-title-text">{{ ch.title || '—' }}</p>
             <div class="chapter-meta">
-              <span class="status-badge" :class="`status-${statusKey(ch.storyboard_status)}`">
-                {{ statusText(ch.storyboard_status) }}
+              <span class="status-badge" :class="`status-${statusKey(ch.analysis_status)}`">
+                {{ statusText(ch.analysis_status) }}
+              </span>
+              <span v-if="ch.analysis_status === 'ready'" class="status-badge sub" :class="`status-${statusKey(ch.storyboard_status)}`">
+                {{ storyboardText(ch.storyboard_status) }}
               </span>
             </div>
           </div>
           <div class="chapter-action">
             <button
               class="action-btn"
-              :class="{ 'action-btn-ready': ch.storyboard_status === 'ready' }"
+              :class="{ 'action-btn-ready': ch.analysis_status === 'ready' }"
               @click.stop="router.push({ name: 'chapter-storyboard', params: { cid: ch.id } })"
             >
-              <svg v-if="ch.storyboard_status === 'ready'" class="action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <svg v-if="ch.analysis_status === 'ready'" class="action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
@@ -48,7 +51,7 @@
                 <path d="M5 3v4M3 5h4M6 17v4M4 19h4" />
                 <path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
               </svg>
-              <span class="action-label">{{ ch.storyboard_status === 'ready' ? '查看分镜' : '解析' }}</span>
+              <span class="action-label">{{ ch.analysis_status === 'ready' ? '查看' : '解析' }}</span>
             </button>
           </div>
         </article>
@@ -110,8 +113,9 @@ async function onLoadMore() {
   }
 }
 
-function statusKey(s) { return ({ none: 'none', extracting: 'extracting', ready: 'ready', failed: 'failed' })[s] || 'none' }
-function statusText(s) { return { none: '未抽取', extracting: '抽取中', ready: '就绪', failed: '失败' }[s] || s }
+function statusKey(s) { return ({ none: 'none', analyzing: 'analyzing', ready: 'ready', failed: 'failed' })[s] || 'none' }
+function statusText(s) { return { none: '未解析', analyzing: '解析中', ready: '已解析', failed: '失败' }[s] || s }
+function storyboardText(s) { return { none: '未分镜', extracting: '分镜中', ready: '已分镜', failed: '失败' }[s] || s }
 </script>
 
 <style scoped>
