@@ -1,11 +1,11 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -581,28 +581,37 @@ func GenerateAssets(c *gin.Context) {
 	db.DB.Model(&ch).Update("assets_status", "generating")
 
 	go func(chapterID, novelID, userID uint64, charText, sceneText string) {
-		status := "ready"
-		userIDStr := strconv.FormatUint(userID, 10)
-		_ = userIDStr // reserved for future per-user asset path/namespacing
+		novelPtr := novelID
 		// 生成角色图
 		for _, entry := range parseAssetEntries(charText) {
-			var existing db.NovelCharacter
-			if db.DB.Where("novel_id = ? AND name = ?", novelID, entry.Name).First(&existing).Error == nil {
-				continue // 已存在，复用
+			// 复用：查 novel_id=X 或 公共池(novel_id IS NULL)
+			var existing db.Generation
+			if db.DB.Where("(novel_id = ? OR novel_id IS NULL) AND novel_asset_type = ? AND novel_asset_name = ? AND status = 'success'",
+				novelID, "character", entry.Name).First(&existing).Error == nil {
+				continue // 已有，复用
 			}
 			imgURL, err := generateAssetImage(entry.Name, entry.Description, "角色立绘")
 			if err != nil {
 				log.Printf("[Novel] 角色图生成失败 [%s]: %v", entry.Name, err)
 				continue
 			}
-			db.DB.Create(&db.NovelCharacter{
-				NovelID: novelID, Name: entry.Name, Description: entry.Description, ImageURL: imgURL,
+			imagesJSON, _ := json.Marshal([]string{imgURL})
+			db.DB.Create(&db.Generation{
+				UserID:         userID,
+				Type:           "image",
+				Prompt:         fmt.Sprintf("角色立绘：%s。%s", entry.Name, entry.Description),
+				Images:         string(imagesJSON),
+				Status:         "success",
+				NovelID:        &novelPtr,
+				NovelAssetType: "character",
+				NovelAssetName: entry.Name,
 			})
 		}
 		// 生成场景图
 		for _, entry := range parseAssetEntries(sceneText) {
-			var existing db.NovelScene
-			if db.DB.Where("novel_id = ? AND name = ?", novelID, entry.Name).First(&existing).Error == nil {
+			var existing db.Generation
+			if db.DB.Where("(novel_id = ? OR novel_id IS NULL) AND novel_asset_type = ? AND novel_asset_name = ? AND status = 'success'",
+				novelID, "scene", entry.Name).First(&existing).Error == nil {
 				continue
 			}
 			imgURL, err := generateAssetImage(entry.Name, entry.Description, "场景概念图")
@@ -610,11 +619,19 @@ func GenerateAssets(c *gin.Context) {
 				log.Printf("[Novel] 场景图生成失败 [%s]: %v", entry.Name, err)
 				continue
 			}
-			db.DB.Create(&db.NovelScene{
-				NovelID: novelID, Name: entry.Name, Description: entry.Description, ImageURL: imgURL,
+			imagesJSON, _ := json.Marshal([]string{imgURL})
+			db.DB.Create(&db.Generation{
+				UserID:         userID,
+				Type:           "image",
+				Prompt:         fmt.Sprintf("场景概念图：%s。%s", entry.Name, entry.Description),
+				Images:         string(imagesJSON),
+				Status:         "success",
+				NovelID:        &novelPtr,
+				NovelAssetType: "scene",
+				NovelAssetName: entry.Name,
 			})
 		}
-		db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).Update("assets_status", status)
+		db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).Update("assets_status", "ready")
 	}(chapterID, n.ID, userID, ch.Characters, ch.Scenes)
 
 	c.JSON(http.StatusOK, gin.H{"status": "generating"})
@@ -633,11 +650,67 @@ func GetAssets(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
-	var characters []db.NovelCharacter
-	db.DB.Where("novel_id = ?", novelID).Order("created_at ASC").Find(&characters)
-	var scenes []db.NovelScene
-	db.DB.Where("novel_id = ?", novelID).Order("created_at ASC").Find(&scenes)
+	var all []db.Generation
+	db.DB.Where("novel_id = ? AND novel_asset_type IS NOT NULL AND status = 'success'", novelID).
+		Order("created_at ASC").Find(&all)
+	var characters, scenes []db.Generation
+	for _, g := range all {
+		if g.NovelAssetType == "character" {
+			characters = append(characters, g)
+		} else if g.NovelAssetType == "scene" {
+			scenes = append(scenes, g)
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{"characters": characters, "scenes": scenes})
+}
+
+// GetPublicAssets GET /api/novel/assets/public  (novel_id IS NULL = 公共池)
+func GetPublicAssets(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	var all []db.Generation
+	db.DB.Where("user_id = ? AND novel_id IS NULL AND novel_asset_type IS NOT NULL AND status = 'success'", userID).
+		Order("created_at ASC").Find(&all)
+	var characters, scenes []db.Generation
+	for _, g := range all {
+		if g.NovelAssetType == "character" {
+			characters = append(characters, g)
+		} else if g.NovelAssetType == "scene" {
+			scenes = append(scenes, g)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"characters": characters, "scenes": scenes})
+}
+
+// MoveAssetScope PUT /api/novel/assets/:id/scope  (在公共池 ↔ 某小说之间移动)
+func MoveAssetScope(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	genID := parseUintParam(c.Param("id"))
+	var gen db.Generation
+	if err := db.DB.First(&gen, genID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "资产不存在"})
+		return
+	}
+	if gen.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权操作"})
+		return
+	}
+	var req struct {
+		NovelID *uint64 `json:"novel_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式无效"})
+		return
+	}
+	// 如果移到某小说，校验所有权
+	if req.NovelID != nil {
+		var n db.Novel
+		if err := db.DB.First(&n, *req.NovelID).Error; err != nil || n.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "无权操作该小说"})
+			return
+		}
+	}
+	db.DB.Model(&gen).Update("novel_id", req.NovelID)
+	c.JSON(http.StatusOK, gin.H{"message": "已移动"})
 }
 
 // parseAssetEntries 把 "name：description\nname：description" 文本解析成条目列表。

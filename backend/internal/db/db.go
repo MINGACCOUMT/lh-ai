@@ -183,6 +183,9 @@ type Generation struct {
 	ErrorMsg        string    `gorm:"type:text;comment:Error message" json:"error_msg"`
 	TaskID          *string   `gorm:"type:varchar(100);index;comment:Provider task ID" json:"task_id"`
 	IsFavorite      bool      `gorm:"type:boolean;default:false;index;comment:Is favorite" json:"is_favorite"`
+	NovelID         *uint64   `gorm:"type:bigint;index" json:"novel_id"`
+	NovelAssetType  string    `gorm:"type:varchar(20)" json:"novel_asset_type"`
+	NovelAssetName  string    `gorm:"type:varchar(100)" json:"novel_asset_name"`
 	CreatedAt       time.Time `gorm:"type:datetime;index;comment:Created at" json:"created_at"`
 	UpdatedAt       time.Time `gorm:"type:datetime;comment:Updated at" json:"updated_at"`
 }

@@ -152,6 +152,9 @@ func main() {
 		{
 			novelGroup.POST("/upload", api.UploadNovel)
 			novelGroup.GET("", api.ListNovels)
+			// 静态路由（assets/public、assets/:id/scope）必须注册在 /:id 之前，避免被参数路由吞掉。
+			novelGroup.GET("/assets/public", api.GetPublicAssets)
+			novelGroup.PUT("/assets/:id/scope", api.MoveAssetScope)
 			novelGroup.GET("/:id", api.GetNovel)
 			novelGroup.DELETE("/:id", api.DeleteNovel)
 			novelGroup.POST("/chapters/:id/storyboard", api.TriggerStoryboard)
