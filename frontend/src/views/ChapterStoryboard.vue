@@ -83,6 +83,72 @@
           </section>
         </div>
 
+        <!-- Assets section -->
+        <div v-if="analysisStatus === 'ready'" class="assets-section">
+          <div class="assets-header">
+            <div class="assets-title-wrap">
+              <span class="assets-title-dot"></span>
+              <span class="assets-title">人物 / 场景图库</span>
+              <span
+                v-if="assetsStatus !== 'none'"
+                class="status-badge"
+                :class="`status-${assetsStatus}`"
+              >
+                {{ assetsStatusText }}
+              </span>
+            </div>
+            <button
+              class="generate-btn small"
+              :class="{ busy: assetsStatus === 'generating' }"
+              :disabled="assetsStatus === 'generating'"
+              @click="onGenerateAssets"
+            >
+              <svg v-if="assetsStatus === 'generating'" class="btn-icon spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <svg v-else class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              {{ assetsStatus === 'generating' ? '生成中…' : (assetsStatus === 'failed' ? '重新生成' : '生成人物/场景图') }}
+            </button>
+          </div>
+
+          <template v-if="assetsReady">
+            <div v-if="assetCharacters.length" class="asset-group">
+              <div class="asset-group-label">角色库</div>
+              <div class="asset-grid">
+                <div v-for="c in assetCharacters" :key="c.id" class="asset-card">
+                  <img v-if="c.image_url" :src="c.image_url" class="asset-img" :alt="c.name" />
+                  <div v-else class="asset-img-placeholder">无图</div>
+                  <div class="asset-info">
+                    <p class="asset-name">{{ c.name || '—' }}</p>
+                    <p v-if="c.description" class="asset-desc">{{ c.description }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="assetScenes.length" class="asset-group">
+              <div class="asset-group-label">场景库</div>
+              <div class="asset-grid">
+                <div v-for="s in assetScenes" :key="s.id" class="asset-card">
+                  <img v-if="s.image_url" :src="s.image_url" class="asset-img" :alt="s.name" />
+                  <div v-else class="asset-img-placeholder">无图</div>
+                  <div class="asset-info">
+                    <p class="asset-name">{{ s.name || '—' }}</p>
+                    <p v-if="s.description" class="asset-desc">{{ s.description }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div v-else-if="assetsStatus === 'ready'" class="assets-empty">
+            <NEmpty size="small" description="暂无人物/场景图" />
+          </div>
+        </div>
+
         <!-- Plots -->
         <div v-if="analysisStatus === 'ready' && plots.length" class="plot-list">
           <article v-for="plot in plots" :key="plot.id" class="plot-card">
@@ -186,8 +252,17 @@ const analysisStatus = computed(() => chapter.value?.analysis_status || 'none')
 
 const analysisStatusText = computed(() => statusText(analysisStatus.value))
 
+const assetsStatus = computed(() => chapter.value?.assets_status || 'none')
+const assetsReady = computed(() => assetsStatus.value === 'ready' && !!(store.assets?.characters?.length || store.assets?.scenes?.length))
+const assetCharacters = computed(() => store.assets?.characters || [])
+const assetScenes = computed(() => store.assets?.scenes || [])
+const assetsStatusText = computed(() => statusText(assetsStatus.value))
+
 onMounted(async () => {
   await refresh()
+  if (chapter.value?.novel_id) {
+    store.loadAssets(chapter.value.novel_id).catch(() => {})
+  }
   schedulePoll()
 })
 onUnmounted(() => {
@@ -196,20 +271,31 @@ onUnmounted(() => {
   saveTimers.clear()
 })
 
-async function refresh() {
-  loading.value = true
+async function refresh({ silent = false } = {}) {
+  const prevAssetsStatus = chapter.value?.assets_status || 'none'
+  if (!silent) loading.value = true
   try {
     await store.openChapter(route.params.cid)
+    const novelId = chapter.value?.novel_id
+    if (novelId) {
+      // Reload assets if they just became ready, or on first load when already ready
+      if (prevAssetsStatus === 'generating' && chapter.value?.assets_status === 'ready') {
+        store.loadAssets(novelId).catch(() => {})
+      } else if (!store.assets && chapter.value?.assets_status === 'ready') {
+        store.loadAssets(novelId).catch(() => {})
+      }
+    }
   } catch (e) {
-    window.$message?.error('加载失败')
+    if (!silent) window.$message?.error('加载失败')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
 function shouldPoll() {
   if (analysisStatus.value === 'analyzing') return true
   if (plots.value.some(p => p.storyboard_status === 'extracting')) return true
+  if (assetsStatus.value === 'generating') return true
   return false
 }
 
@@ -217,7 +303,7 @@ function schedulePoll() {
   if (pollTimer) clearTimeout(pollTimer)
   if (shouldPoll()) {
     pollTimer = setTimeout(async () => {
-      await refresh()
+      await refresh({ silent: true })
       schedulePoll()
     }, 3000)
   }
@@ -235,6 +321,16 @@ async function onAnalyze() {
 async function onStoryboard(plot) {
   try {
     await store.storyboardForPlot(plot.id)
+    schedulePoll()
+  } catch (e) {
+    window.$message?.error(e.response?.data?.error || '生成失败')
+  }
+}
+
+async function onGenerateAssets() {
+  try {
+    await store.generateAssets(route.params.cid)
+    window.$message?.info('开始生成人物/场景图')
     schedulePoll()
   } catch (e) {
     window.$message?.error(e.response?.data?.error || '生成失败')
@@ -502,6 +598,128 @@ function storyboardStatusText(s) {
   color: var(--color-text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Assets section */
+.assets-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  background: var(--color-tint-white-02);
+  border: 1px solid rgba(0, 202, 224, 0.22);
+  border-left: 3px solid #00cae0;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px var(--color-tint-black-30);
+}
+.assets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.assets-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.assets-title-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00cae0;
+  box-shadow: 0 0 8px rgba(0, 202, 224, 0.6);
+  flex-shrink: 0;
+}
+.assets-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #00cae0;
+  letter-spacing: 0.04em;
+}
+.asset-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.asset-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #00cae0;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.asset-card {
+  background: var(--color-tint-white-03);
+  border: 1px solid var(--color-tint-white-06);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+}
+.asset-card:hover {
+  border-color: rgba(0, 202, 224, 0.35);
+  box-shadow: 0 6px 18px var(--color-tint-black-30);
+  transform: translateY(-2px);
+}
+.asset-img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+  background: var(--color-tint-white-04);
+  border-radius: 8px 8px 0 0;
+}
+.asset-img-placeholder {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-tint-white-04);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.asset-info {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+}
+.asset-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.asset-desc {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.assets-empty {
+  padding: 8px 0;
+  display: flex;
+  justify-content: center;
 }
 
 /* Plot list */

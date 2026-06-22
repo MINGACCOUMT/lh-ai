@@ -27,5 +27,7 @@ export function useNovel() {
     triggerStoryboard: (chapterId) => instance.post(`/chapters/${chapterId}/storyboard`),
     getStoryboard: (chapterId) => instance.get(`/chapters/${chapterId}/storyboard`),
     updateShot: (shotId, payload) => instance.put(`/shots/${shotId}`, payload),
+    generateAssets: (chapterId) => instance.post(`/chapters/${chapterId}/assets`),
+    getAssets: (novelId) => instance.get(`/${novelId}/assets`),
   }
 }
