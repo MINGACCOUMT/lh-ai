@@ -12,6 +12,7 @@ export const useNovelStore = defineStore('novel', () => {
   const currentStoryboard = ref(null)
   const chapterDetail = ref(null)
   const assets = ref(null)
+  const publicAssets = ref(null)
 
   async function loadNovels() {
     const { data } = await api.listNovels({ limit: 50 })
@@ -74,9 +75,28 @@ export const useNovelStore = defineStore('novel', () => {
     assets.value = data
     return data
   }
+  async function loadPublicAssets() {
+    const { data } = await api.getPublicAssets()
+    publicAssets.value = data
+    return data
+  }
+  async function moveAssetScope(assetId, novelId) {
+    await api.moveAssetScope(assetId, novelId)
+    // Reload whichever pools are already loaded so the UI stays fresh.
+    // Use the current novel id (not the move target) for the novel-scoped reload.
+    const reloads = []
+    const curNovelId = chapterDetail.value?.chapter?.novel_id || currentNovel.value?.id || null
+    if (assets.value && curNovelId) {
+      reloads.push(api.getAssets(curNovelId).then(({ data }) => { assets.value = data }))
+    }
+    if (publicAssets.value) {
+      reloads.push(api.getPublicAssets().then(({ data }) => { publicAssets.value = data }))
+    }
+    await Promise.all(reloads)
+  }
   return {
-    novels, currentNovel, chapters, chapterTotal, chapterLimit, currentStoryboard, chapterDetail, assets,
+    novels, currentNovel, chapters, chapterTotal, chapterLimit, currentStoryboard, chapterDetail, assets, publicAssets,
     loadNovels, uploadNovel, openNovel, loadMoreChapters, removeNovel, loadStoryboard, triggerStoryboard,
-    openChapter, analyzeChapter, storyboardForPlot, saveShot, generateAssets, loadAssets,
+    openChapter, analyzeChapter, storyboardForPlot, saveShot, generateAssets, loadAssets, loadPublicAssets, moveAssetScope,
   }
 })

@@ -29,5 +29,7 @@ export function useNovel() {
     updateShot: (shotId, payload) => instance.put(`/shots/${shotId}`, payload),
     generateAssets: (chapterId) => instance.post(`/chapters/${chapterId}/assets`),
     getAssets: (novelId) => instance.get(`/${novelId}/assets`),
+    getPublicAssets: () => instance.get('/assets/public'),
+    moveAssetScope: (assetId, novelId) => instance.put(`/assets/${assetId}/scope`, { novel_id: novelId }),
   }
 }

@@ -116,15 +116,33 @@
           </div>
 
           <template v-if="assetsReady">
+            <!-- Pool toggle: novel library vs public pool -->
+            <div class="asset-pool-toggle">
+              <button
+                class="pool-tab"
+                :class="{ active: activePool === 'novel' }"
+                @click="activePool = 'novel'"
+              >📖 小说资源库</button>
+              <button
+                class="pool-tab"
+                :class="{ active: activePool === 'public' }"
+                @click="onSelectPublic"
+              >🌍 公共池</button>
+            </div>
+
             <div v-if="assetCharacters.length" class="asset-group">
               <div class="asset-group-label">角色库</div>
               <div class="asset-grid">
                 <div v-for="c in assetCharacters" :key="c.id" class="asset-card">
-                  <img v-if="c.image_url" :src="c.image_url" class="asset-img" :alt="c.name" />
+                  <img v-if="assetImage(c)" :src="assetImage(c)" class="asset-img" :alt="c.novel_asset_name" />
                   <div v-else class="asset-img-placeholder">无图</div>
                   <div class="asset-info">
-                    <p class="asset-name">{{ c.name || '—' }}</p>
-                    <p v-if="c.description" class="asset-desc">{{ c.description }}</p>
+                    <p class="asset-name">{{ c.novel_asset_name || '—' }}</p>
+                    <p v-if="c.prompt" class="asset-desc">{{ c.prompt }}</p>
+                    <button
+                      class="asset-move-btn"
+                      @click="onMoveAsset(c)"
+                    >{{ activePool === 'novel' ? '移到公共池' : '移到本书' }}</button>
                   </div>
                 </div>
               </div>
@@ -134,11 +152,15 @@
               <div class="asset-group-label">场景库</div>
               <div class="asset-grid">
                 <div v-for="s in assetScenes" :key="s.id" class="asset-card">
-                  <img v-if="s.image_url" :src="s.image_url" class="asset-img" :alt="s.name" />
+                  <img v-if="assetImage(s)" :src="assetImage(s)" class="asset-img" :alt="s.novel_asset_name" />
                   <div v-else class="asset-img-placeholder">无图</div>
                   <div class="asset-info">
-                    <p class="asset-name">{{ s.name || '—' }}</p>
-                    <p v-if="s.description" class="asset-desc">{{ s.description }}</p>
+                    <p class="asset-name">{{ s.novel_asset_name || '—' }}</p>
+                    <p v-if="s.prompt" class="asset-desc">{{ s.prompt }}</p>
+                    <button
+                      class="asset-move-btn"
+                      @click="onMoveAsset(s)"
+                    >{{ activePool === 'novel' ? '移到公共池' : '移到本书' }}</button>
                   </div>
                 </div>
               </div>
@@ -243,6 +265,7 @@ const router = useRouter()
 const store = useNovelStore()
 
 const loading = ref(false)
+const activePool = ref('novel') // 'novel' | 'public'
 let pollTimer = null
 const saveTimers = new Map()
 
@@ -253,10 +276,39 @@ const analysisStatus = computed(() => chapter.value?.analysis_status || 'none')
 const analysisStatusText = computed(() => statusText(analysisStatus.value))
 
 const assetsStatus = computed(() => chapter.value?.assets_status || 'none')
-const assetsReady = computed(() => assetsStatus.value === 'ready' && !!(store.assets?.characters?.length || store.assets?.scenes?.length))
-const assetCharacters = computed(() => store.assets?.characters || [])
-const assetScenes = computed(() => store.assets?.scenes || [])
+
+// Active pool source: novel-scoped store.assets, or public store.publicAssets
+const currentAssets = computed(() => activePool.value === 'public' ? store.publicAssets : store.assets)
+const assetsReady = computed(() => {
+  if (activePool.value === 'public') {
+    return !!(store.publicAssets?.characters?.length || store.publicAssets?.scenes?.length)
+  }
+  return assetsStatus.value === 'ready' && !!(store.assets?.characters?.length || store.assets?.scenes?.length)
+})
+const assetCharacters = computed(() => currentAssets.value?.characters || [])
+const assetScenes = computed(() => currentAssets.value?.scenes || [])
 const assetsStatusText = computed(() => statusText(assetsStatus.value))
+
+function assetImage(asset) {
+  try { return JSON.parse(asset.images || '[]')[0] || '' } catch { return '' }
+}
+
+async function onSelectPublic() {
+  activePool.value = 'public'
+  if (!store.publicAssets) {
+    try { await store.loadPublicAssets() } catch { window.$message?.error('加载公共池失败') }
+  }
+}
+
+async function onMoveAsset(asset) {
+  const targetId = activePool.value === 'novel' ? null : (chapter.value?.novel_id || null)
+  try {
+    await store.moveAssetScope(asset.id, targetId)
+    window.$message?.success(activePool.value === 'novel' ? '已移到公共池' : '已移到本书')
+  } catch (e) {
+    window.$message?.error(e.response?.data?.error || '移动失败')
+  }
+}
 
 onMounted(async () => {
   await refresh()
@@ -284,6 +336,10 @@ async function refresh({ silent = false } = {}) {
       } else if (!store.assets && chapter.value?.assets_status === 'ready') {
         store.loadAssets(novelId).catch(() => {})
       }
+    }
+    // Keep public pool fresh too, but only if already loaded
+    if (store.publicAssets) {
+      store.loadPublicAssets().catch(() => {})
     }
   } catch (e) {
     if (!silent) window.$message?.error('加载失败')
@@ -720,6 +776,59 @@ function storyboardStatusText(s) {
   padding: 8px 0;
   display: flex;
   justify-content: center;
+}
+
+/* Pool toggle */
+.asset-pool-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--color-tint-white-03);
+  border: 1px solid var(--color-tint-white-06);
+  border-radius: 10px;
+  align-self: flex-start;
+}
+.pool-tab {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+.pool-tab:hover {
+  color: var(--color-text-primary);
+}
+.pool-tab.active {
+  background: rgba(0, 202, 224, 0.18);
+  color: #d8fbff;
+  border: 1px solid rgba(0, 202, 224, 0.35);
+}
+
+/* Move button on asset card */
+.asset-move-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(0, 202, 224, 0.3);
+  background: rgba(0, 202, 224, 0.08);
+  color: #8cefff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+.asset-move-btn:hover {
+  background: rgba(0, 202, 224, 0.22);
+  border-color: rgba(0, 202, 224, 0.5);
 }
 
 /* Plot list */
