@@ -57,7 +57,7 @@ func (g *GPTImageModel) GenerateImage(prompt string, opts ImageOptions) (*ImageR
 	jsonData, _ := json.Marshal(reqBody)
 
 	apiURL := baseURL + "/v1/images/generations"
-	client := &http.Client{Timeout: 300 * time.Second}
+	client := &http.Client{Timeout: 180 * time.Second} // 单张超 3 分钟判失败
 	log.Printf("[GPTImage] 调用: %s model=%s", apiURL, model)
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
