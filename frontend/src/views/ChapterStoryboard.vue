@@ -256,10 +256,11 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NEmpty, NSpin, NInput } from 'naive-ui'
+import { NEmpty, NSpin, NInput, useMessage } from 'naive-ui'
 import { useNovelStore } from '../stores/novel'
 
 const { t } = useI18n()
+const message = useMessage()
 const route = useRoute()
 const router = useRouter()
 const store = useNovelStore()
@@ -296,7 +297,7 @@ function assetImage(asset) {
 async function onSelectPublic() {
   activePool.value = 'public'
   if (!store.publicAssets) {
-    try { await store.loadPublicAssets() } catch { window.$message?.error('加载公共池失败') }
+    try { await store.loadPublicAssets() } catch { message.error('加载公共池失败') }
   }
 }
 
@@ -304,9 +305,9 @@ async function onMoveAsset(asset) {
   const targetId = activePool.value === 'novel' ? null : (chapter.value?.novel_id || null)
   try {
     await store.moveAssetScope(asset.id, targetId)
-    window.$message?.success(activePool.value === 'novel' ? '已移到公共池' : '已移到本书')
+    message.success(activePool.value === 'novel' ? '已移到公共池' : '已移到本书')
   } catch (e) {
-    window.$message?.error(e.response?.data?.error || '移动失败')
+    message.error(e.response?.data?.error || '移动失败')
   }
 }
 
@@ -369,7 +370,7 @@ async function refresh({ silent = false } = {}) {
       store.loadPublicAssets().catch(() => {})
     }
   } catch (e) {
-    if (!silent) window.$message?.error('加载失败')
+    if (!silent) message.error('加载失败')
   } finally {
     if (!silent) loading.value = false
   }
@@ -394,31 +395,31 @@ function schedulePoll() {
 
 async function onAnalyze() {
   try {
-    window.$message?.info('正在解析本章，约 15 秒，请稍候…')
+    message.info('正在解析本章，约 15 秒，请稍候…')
     await store.analyzeChapter(route.params.cid)
     schedulePoll()
   } catch (e) {
-    window.$message?.error(e.response?.data?.error || '解析失败')
+    message.error(e.response?.data?.error || '解析失败')
   }
 }
 
 async function onStoryboard(plot) {
   try {
-    window.$message?.info('正在生成分镜，约 12 秒，请稍候…')
+    message.info('正在生成分镜，约 12 秒，请稍候…')
     await store.storyboardForPlot(plot.id)
     schedulePoll()
   } catch (e) {
-    window.$message?.error(e.response?.data?.error || '生成失败')
+    message.error(e.response?.data?.error || '生成失败')
   }
 }
 
 async function onGenerateAssets() {
   try {
-    window.$message?.info('正在生成人物/场景图，每张约 60 秒，请稍候…')
+    message.info('正在生成人物/场景图，每张约 60 秒，请稍候…')
     await store.generateAssets(route.params.cid)
     schedulePoll()
   } catch (e) {
-    window.$message?.error(e.response?.data?.error || '生成失败')
+    message.error(e.response?.data?.error || '生成失败')
   }
 }
 
@@ -433,7 +434,7 @@ function scheduleSave(shot) {
       prompt: shot.prompt,
       dialogue: shot.dialogue,
       camera: shot.camera,
-    }).catch(() => window.$message?.error('保存失败'))
+    }).catch(() => message.error('保存失败'))
   }, 500)
   saveTimers.set(shot.id, t)
 }
