@@ -367,6 +367,7 @@ function schedulePoll() {
 
 async function onAnalyze() {
   try {
+    window.$message?.info('正在解析本章，约 15 秒，请稍候…')
     await store.analyzeChapter(route.params.cid)
     schedulePoll()
   } catch (e) {
@@ -376,6 +377,7 @@ async function onAnalyze() {
 
 async function onStoryboard(plot) {
   try {
+    window.$message?.info('正在生成分镜，约 12 秒，请稍候…')
     await store.storyboardForPlot(plot.id)
     schedulePoll()
   } catch (e) {
@@ -385,8 +387,8 @@ async function onStoryboard(plot) {
 
 async function onGenerateAssets() {
   try {
+    window.$message?.info('正在生成人物/场景图，每张约 60 秒，请稍候…')
     await store.generateAssets(route.params.cid)
-    window.$message?.info('开始生成人物/场景图')
     schedulePoll()
   } catch (e) {
     window.$message?.error(e.response?.data?.error || '生成失败')
