@@ -25,6 +25,12 @@ export const useNovelStore = defineStore('novel', () => {
     return data
   }
   async function openNovel(id) {
+    // Clear stale state BEFORE the await so the UI doesn't show the previous
+    // novel's data while the new one is loading.
+    currentNovel.value = null
+    chapters.value = []
+    chapterTotal.value = 0
+    chapterDetail.value = null
     const { data } = await api.getNovel(id, { limit: chapterLimit.value, offset: 0 })
     currentNovel.value = data.novel
     chapters.value = data.chapters || []
@@ -51,6 +57,9 @@ export const useNovelStore = defineStore('novel', () => {
     await api.triggerStoryboard(chapterId)
   }
   async function openChapter(id) {
+    // Clear stale chapter detail BEFORE the await so the previous chapter's
+    // data doesn't bleed through while the new one loads.
+    chapterDetail.value = null
     const { data } = await api.getChapterDetail(id)
     chapterDetail.value = data
     return data

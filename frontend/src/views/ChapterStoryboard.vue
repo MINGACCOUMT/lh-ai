@@ -253,7 +253,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NEmpty, NSpin, NInput } from 'naive-ui'
@@ -311,12 +311,39 @@ async function onMoveAsset(asset) {
 }
 
 onMounted(async () => {
-  await refresh()
-  if (chapter.value?.novel_id) {
-    store.loadAssets(chapter.value.novel_id).catch(() => {})
-  }
-  schedulePoll()
+  await loadChapterData(route.params.cid)
 })
+
+// Vue Router reuses this component across chapter-id changes, so onMounted
+// won't re-fire on navigation. Reload (and reset local UI state) when the cid
+// param changes. First load is handled by onMounted above.
+watch(
+  () => route.params.cid,
+  (newCid, oldCid) => {
+    if (newCid && newCid !== oldCid) loadChapterData(newCid)
+  }
+)
+
+// Shared loader used by both onMounted and the route watcher. Resets all
+// local UI state so nothing from the previous chapter leaks through.
+async function loadChapterData(cid) {
+  // Cancel any in-flight polling and pending shot saves for the old chapter.
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
+  for (const t of saveTimers.values()) clearTimeout(t)
+  saveTimers.clear()
+  // Reset local UI state — pool selection back to the novel library.
+  activePool.value = 'novel'
+  loading.value = true
+  try {
+    await refresh()
+    if (chapter.value?.novel_id) {
+      store.loadAssets(chapter.value.novel_id).catch(() => {})
+    }
+    schedulePoll()
+  } finally {
+    loading.value = false
+  }
+}
 onUnmounted(() => {
   if (pollTimer) clearTimeout(pollTimer)
   for (const t of saveTimers.values()) clearTimeout(t)

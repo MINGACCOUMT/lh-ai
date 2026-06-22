@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NEmpty } from 'naive-ui'
@@ -88,6 +88,15 @@ const hasMore = computed(() => store.chapters.length < store.chapterTotal)
 const remaining = computed(() => Math.max(0, store.chapterTotal - store.chapters.length))
 
 onMounted(() => store.openNovel(route.params.id))
+
+// Vue Router reuses this component across novel-id changes, so onMounted won't
+// re-fire. Reload when the id param changes (first load is handled by onMounted).
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) store.openNovel(newId)
+  }
+)
 
 async function onLoadMore() {
   if (loadingMore.value || !hasMore.value) return
