@@ -98,12 +98,13 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NEmpty } from 'naive-ui'
+import { NEmpty, useMessage } from 'naive-ui'
 import { useNovelStore } from '../stores/novel'
 import { useUserStore } from '../stores/user'
 import { useLocaleStore } from '../stores/locale'
 
 const { t } = useI18n()
+const message = useMessage()
 const router = useRouter()
 const store = useNovelStore()
 const user = useUserStore()
@@ -137,11 +138,11 @@ async function handleUpload({ file }) {
   uploading.value = true
   try {
     const res = await store.uploadNovel(file.file)
-    if (res.warning) window.$message?.warning(res.warning)
-    window.$message?.success('上传成功')
+    if (res.warning) message.warning(res.warning)
+    message.success('上传成功')
     router.push({ name: 'novel-detail', params: { id: res.novel_id } })
   } catch (e) {
-    window.$message?.error(e.response?.data?.error || '上传失败')
+    message.error(e.response?.data?.error || '上传失败')
   } finally {
     uploading.value = false
   }
