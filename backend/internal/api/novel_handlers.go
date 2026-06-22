@@ -120,7 +120,8 @@ func ListNovels(c *gin.Context) {
 	userID := c.GetUint64("userID")
 	limit, offset := parseListPagination(c)
 	var novels []db.Novel
-	db.DB.Where("user_id = ? AND status = 'active'", userID).
+	db.DB.Select("id, user_id, title, source_filename, chapter_count, status, created_at, updated_at").
+		Where("user_id = ? AND status = 'active'", userID).
 		Order("created_at DESC").Limit(limit).Offset(offset).Find(&novels)
 	var total int64
 	db.DB.Model(&db.Novel{}).Where("user_id = ? AND status = 'active'", userID).Count(&total)
@@ -131,7 +132,8 @@ func ListNovels(c *gin.Context) {
 func GetNovel(c *gin.Context) {
 	userID := c.GetUint64("userID")
 	var n db.Novel
-	if err := db.DB.First(&n, c.Param("id")).Error; err != nil {
+	if err := db.DB.Select("id, user_id, title, source_filename, chapter_count, status, created_at, updated_at").
+		First(&n, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "小说不存在"})
 		return
 	}
@@ -141,7 +143,8 @@ func GetNovel(c *gin.Context) {
 	}
 	limit, offset := parseListPagination(c)
 	var chapters []db.NovelChapter
-	db.DB.Where("novel_id = ?", n.ID).Order("chapter_index ASC").Limit(limit).Offset(offset).Find(&chapters)
+	db.DB.Select("id, novel_id, chapter_index, title, storyboard_status, analysis_status, assets_status").
+		Where("novel_id = ?", n.ID).Order("chapter_index ASC").Limit(limit).Offset(offset).Find(&chapters)
 	var chapterTotal int64
 	db.DB.Model(&db.NovelChapter{}).Where("novel_id = ?", n.ID).Count(&chapterTotal)
 	type chLite struct {
@@ -167,7 +170,7 @@ func GetNovel(c *gin.Context) {
 func DeleteNovel(c *gin.Context) {
 	userID := c.GetUint64("userID")
 	var n db.Novel
-	if err := db.DB.First(&n, c.Param("id")).Error; err != nil {
+	if err := db.DB.Select("id, user_id").First(&n, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "小说不存在"})
 		return
 	}
@@ -208,7 +211,7 @@ func TriggerStoryboard(c *gin.Context) {
 		return
 	}
 	var n db.Novel
-	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+	if err := db.DB.Select("id, user_id").First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
@@ -289,7 +292,7 @@ func GetStoryboard(c *gin.Context) {
 		return
 	}
 	var n db.Novel
-	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+	if err := db.DB.Select("id, user_id").First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
@@ -320,7 +323,7 @@ func UpdateShot(c *gin.Context) {
 		return
 	}
 	var n db.Novel
-	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+	if err := db.DB.Select("id, user_id").First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
@@ -370,7 +373,7 @@ func AnalyzeChapterHandler(c *gin.Context) {
 		return
 	}
 	var n db.Novel
-	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+	if err := db.DB.Select("id, user_id").First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
@@ -452,7 +455,7 @@ func GetChapterDetail(c *gin.Context) {
 		return
 	}
 	var n db.Novel
-	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+	if err := db.DB.Select("id, user_id").First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
@@ -489,7 +492,7 @@ func StoryboardForPlot(c *gin.Context) {
 		return
 	}
 	var n db.Novel
-	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+	if err := db.DB.Select("id, user_id").First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
@@ -565,7 +568,7 @@ func GenerateAssets(c *gin.Context) {
 		return
 	}
 	var n db.Novel
-	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+	if err := db.DB.Select("id, user_id").First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
 		return
 	}
@@ -642,7 +645,7 @@ func GetAssets(c *gin.Context) {
 	userID := c.GetUint64("userID")
 	novelID := parseUintParam(c.Param("id"))
 	var n db.Novel
-	if err := db.DB.First(&n, novelID).Error; err != nil {
+	if err := db.DB.Select("id, user_id").First(&n, novelID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "小说不存在"})
 		return
 	}
@@ -704,7 +707,7 @@ func MoveAssetScope(c *gin.Context) {
 	// 如果移到某小说，校验所有权
 	if req.NovelID != nil {
 		var n db.Novel
-		if err := db.DB.First(&n, *req.NovelID).Error; err != nil || n.UserID != userID {
+		if err := db.DB.Select("id, user_id").First(&n, *req.NovelID).Error; err != nil || n.UserID != userID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "无权操作该小说"})
 			return
 		}
