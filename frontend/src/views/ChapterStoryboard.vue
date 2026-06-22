@@ -352,17 +352,34 @@ onUnmounted(() => {
 })
 
 async function refresh({ silent = false } = {}) {
-  const prevAssetsStatus = chapter.value?.assets_status || 'none'
+  const prevAnalysis = chapter.value?.analysis_status || 'none'
+  const prevAssets = chapter.value?.assets_status || 'none'
+  const prevPlots = (plots.value || []).map(p => ({ id: p.id, title: p.title, status: p.storyboard_status }))
   if (!silent) loading.value = true
   try {
     await store.openChapter(route.params.cid)
     const novelId = chapter.value?.novel_id
-    if (novelId) {
-      // Reload assets if they just became ready, or on first load when already ready
-      if (prevAssetsStatus === 'generating' && chapter.value?.assets_status === 'ready') {
-        store.loadAssets(novelId).catch(() => {})
-      } else if (!store.assets && chapter.value?.assets_status === 'ready') {
-        store.loadAssets(novelId).catch(() => {})
+    // 完成提示：检测状态转换
+    if (prevAnalysis === 'analyzing' && chapter.value?.analysis_status === 'ready') {
+      message.success('解析完成！')
+    } else if (prevAnalysis === 'analyzing' && chapter.value?.analysis_status === 'failed') {
+      message.error('解析失败，请重试')
+    }
+    if (prevAssets === 'generating' && chapter.value?.assets_status === 'ready') {
+      message.success('人物/场景图生成完成！')
+      if (novelId) store.loadAssets(novelId).catch(() => {})
+    } else if (prevAssets === 'generating' && chapter.value?.assets_status === 'failed') {
+      message.error('资产生成失败')
+    } else if (!store.assets && chapter.value?.assets_status === 'ready' && novelId) {
+      store.loadAssets(novelId).catch(() => {})
+    }
+    // 情节分镜完成
+    const currPlots = plots.value || []
+    for (const pp of prevPlots) {
+      const curr = currPlots.find(p => p.id === pp.id)
+      if (pp.status === 'extracting' && curr) {
+        if (curr.storyboard_status === 'ready') message.success(`「${curr.title}」分镜生成完成！`)
+        else if (curr.storyboard_status === 'failed') message.error(`「${curr.title}」分镜生成失败`)
       }
     }
     // Keep public pool fresh too, but only if already loaded
