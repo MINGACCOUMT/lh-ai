@@ -52,6 +52,12 @@ func main() {
 
 	auth.InitSecretKey()
 	db.InitDB()
+	// 清理上次中断的 novel 生成状态（goroutine 随重启死亡）
+	db.DB.Model(&db.NovelChapter{}).Where("analysis_status = 'analyzing'").Update("analysis_status", "failed")
+	db.DB.Model(&db.NovelChapter{}).Where("assets_status = 'generating'").Update("assets_status", "failed")
+	db.DB.Model(&db.NovelChapter{}).Where("storyboard_status = 'extracting'").Update("storyboard_status", "failed")
+	db.DB.Model(&db.NovelPlot{}).Where("storyboard_status = 'extracting'").Update("storyboard_status", "failed")
+	log.Println("novel: 清理了中断的生成状态")
 	email.InitEmail()
 
 	if err := storage.InitOSS(); err != nil {

@@ -244,6 +244,13 @@ func TriggerStoryboard(c *gin.Context) {
 	db.DB.Where("chapter_id = ?", chapterID).Delete(&db.NovelShot{})
 
 	go func(chapterID, userID uint64, credits int, content string) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[Novel] panic recovered (storyboard): %v", r)
+				db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).
+					Update("storyboard_status", "failed")
+			}
+		}()
 		status := "ready"
 		res, err := novel.ExtractStoryboard(content)
 		if err != nil {
@@ -408,6 +415,13 @@ func AnalyzeChapterHandler(c *gin.Context) {
 	db.DB.Where("chapter_id = ?", chapterID).Delete(&db.NovelPlot{})
 
 	go func(chapterID, userID uint64, credits int, content string) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[Novel] panic recovered (analyze): %v", r)
+				db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).
+					Update("analysis_status", "failed")
+			}
+		}()
 		status := "ready"
 		res, err := novel.AnalyzeChapter(content)
 		if err != nil {
@@ -523,6 +537,13 @@ func StoryboardForPlot(c *gin.Context) {
 	db.DB.Where("plot_id = ?", plotID).Delete(&db.NovelShot{})
 
 	go func(plotID, userID uint64, credits int, p db.NovelPlot, chChars, chScenes string) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[Novel] panic recovered (plot-storyboard): %v", r)
+				db.DB.Model(&db.NovelPlot{}).Where("id = ?", plotID).
+					Update("storyboard_status", "failed")
+			}
+		}()
 		status := "ready"
 		shots, err := novel.ExtractShotsForPlot(novel.Plot{Title: p.Title, Summary: p.Summary}, chChars, chScenes)
 		if err != nil {
@@ -586,6 +607,13 @@ func GenerateAssets(c *gin.Context) {
 	db.DB.Model(&ch).Update("assets_status", "generating")
 
 	go func(chapterID, novelID, userID uint64, charText, sceneText string) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[Novel] panic recovered (assets): %v", r)
+				db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).
+					Update("assets_status", "failed")
+			}
+		}()
 		novelPtr := novelID
 		// 生成角色图
 		for _, entry := range parseAssetEntries(charText) {
