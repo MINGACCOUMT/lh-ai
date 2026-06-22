@@ -24,6 +24,7 @@ type NovelChapter struct {
 	Characters       string    `gorm:"type:text" json:"characters"`
 	Scenes           string    `gorm:"type:text" json:"scenes"`
 	AnalysisStatus   string    `gorm:"type:varchar(20);default:'none'" json:"analysis_status"`
+	AssetsStatus     string    `gorm:"type:varchar(20);default:'none'" json:"assets_status"`
 	StoryboardStatus string    `gorm:"type:varchar(20);default:'none'" json:"storyboard_status"`
 	CreatedAt        time.Time `gorm:"type:datetime" json:"created_at"`
 	UpdatedAt        time.Time `gorm:"type:datetime" json:"updated_at"`
@@ -43,6 +44,26 @@ type NovelShot struct {
 	VideoURL   string    `gorm:"type:varchar(500)" json:"video_url"`
 	CreatedAt  time.Time `gorm:"type:datetime" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"type:datetime" json:"updated_at"`
+}
+
+// NovelCharacter 小说级角色资产（name 在 novel 内唯一，跨章节复用）。
+type NovelCharacter struct {
+	ID          uint64    `gorm:"primaryKey" json:"id"`
+	NovelID     uint64    `gorm:"type:bigint;index;not null" json:"novel_id"`
+	Name        string    `gorm:"type:varchar(100);not null" json:"name"`
+	Description string    `gorm:"type:varchar(500)" json:"description"`
+	ImageURL    string    `gorm:"type:varchar(500)" json:"image_url"`
+	CreatedAt   time.Time `gorm:"type:datetime" json:"created_at"`
+}
+
+// NovelScene 小说级场景资产（name 在 novel 内唯一，跨章节复用）。
+type NovelScene struct {
+	ID          uint64    `gorm:"primaryKey" json:"id"`
+	NovelID     uint64    `gorm:"type:bigint;index;not null" json:"novel_id"`
+	Name        string    `gorm:"type:varchar(100);not null" json:"name"`
+	Description string    `gorm:"type:varchar(500)" json:"description"`
+	ImageURL    string    `gorm:"type:varchar(500)" json:"image_url"`
+	CreatedAt   time.Time `gorm:"type:datetime" json:"created_at"`
 }
 
 // NovelPlot 是一章里的一个情节（v2：情节层，分镜后续将挂到 plot）。

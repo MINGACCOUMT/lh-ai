@@ -160,6 +160,8 @@ func main() {
 			novelGroup.GET("/chapters/:id", api.GetChapterDetail)
 			novelGroup.PUT("/shots/:id", api.UpdateShot)
 			novelGroup.POST("/plots/:id/storyboard", api.StoryboardForPlot)
+			novelGroup.POST("/chapters/:id/assets", api.GenerateAssets)
+			novelGroup.GET("/:id/assets", api.GetAssets)
 		}
 
 		// Admin moderation

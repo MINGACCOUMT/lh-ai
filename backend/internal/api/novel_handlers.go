@@ -1,9 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -11,6 +13,8 @@ import (
 	"google-ai-proxy/internal/config"
 	"google-ai-proxy/internal/db"
 	"google-ai-proxy/internal/novel"
+	"google-ai-proxy/internal/provider"
+	"google-ai-proxy/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -548,4 +552,134 @@ func StoryboardForPlot(c *gin.Context) {
 	}(plotID, userID, credits, plot, ch.Characters, ch.Scenes)
 
 	c.JSON(http.StatusOK, gin.H{"status": "extracting"})
+}
+
+// GenerateAssets POST /api/novel/chapters/:id/assets
+// 解析本章人物画像/场景文本，为每个新角色/场景生成图像，存入小说级资产库。
+func GenerateAssets(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	chapterID := parseUintParam(c.Param("id"))
+	var ch db.NovelChapter
+	if err := db.DB.First(&ch, chapterID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "章节不存在"})
+		return
+	}
+	var n db.Novel
+	if err := db.DB.First(&n, ch.NovelID).Error; err != nil || n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	if ch.AssetsStatus == "generating" {
+		c.JSON(http.StatusConflict, gin.H{"error": "该章节正在生成资产"})
+		return
+	}
+	if ch.AnalysisStatus != "ready" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请先解析章节"})
+		return
+	}
+
+	db.DB.Model(&ch).Update("assets_status", "generating")
+
+	go func(chapterID, novelID, userID uint64, charText, sceneText string) {
+		status := "ready"
+		userIDStr := strconv.FormatUint(userID, 10)
+		_ = userIDStr // reserved for future per-user asset path/namespacing
+		// 生成角色图
+		for _, entry := range parseAssetEntries(charText) {
+			var existing db.NovelCharacter
+			if db.DB.Where("novel_id = ? AND name = ?", novelID, entry.Name).First(&existing).Error == nil {
+				continue // 已存在，复用
+			}
+			imgURL, err := generateAssetImage(entry.Name, entry.Description, "角色立绘")
+			if err != nil {
+				log.Printf("[Novel] 角色图生成失败 [%s]: %v", entry.Name, err)
+				continue
+			}
+			db.DB.Create(&db.NovelCharacter{
+				NovelID: novelID, Name: entry.Name, Description: entry.Description, ImageURL: imgURL,
+			})
+		}
+		// 生成场景图
+		for _, entry := range parseAssetEntries(sceneText) {
+			var existing db.NovelScene
+			if db.DB.Where("novel_id = ? AND name = ?", novelID, entry.Name).First(&existing).Error == nil {
+				continue
+			}
+			imgURL, err := generateAssetImage(entry.Name, entry.Description, "场景概念图")
+			if err != nil {
+				log.Printf("[Novel] 场景图生成失败 [%s]: %v", entry.Name, err)
+				continue
+			}
+			db.DB.Create(&db.NovelScene{
+				NovelID: novelID, Name: entry.Name, Description: entry.Description, ImageURL: imgURL,
+			})
+		}
+		db.DB.Model(&db.NovelChapter{}).Where("id = ?", chapterID).Update("assets_status", status)
+	}(chapterID, n.ID, userID, ch.Characters, ch.Scenes)
+
+	c.JSON(http.StatusOK, gin.H{"status": "generating"})
+}
+
+// GetAssets GET /api/novel/:id/assets
+func GetAssets(c *gin.Context) {
+	userID := c.GetUint64("userID")
+	novelID := parseUintParam(c.Param("id"))
+	var n db.Novel
+	if err := db.DB.First(&n, novelID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "小说不存在"})
+		return
+	}
+	if n.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问"})
+		return
+	}
+	var characters []db.NovelCharacter
+	db.DB.Where("novel_id = ?", novelID).Order("created_at ASC").Find(&characters)
+	var scenes []db.NovelScene
+	db.DB.Where("novel_id = ?", novelID).Order("created_at ASC").Find(&scenes)
+	c.JSON(http.StatusOK, gin.H{"characters": characters, "scenes": scenes})
+}
+
+// parseAssetEntries 把 "name：description\nname：description" 文本解析成条目列表。
+// 优先按中文全角 "：" 分割，回退到 ASCII ":"。
+func parseAssetEntries(text string) []struct{ Name, Description string } {
+	var entries []struct{ Name, Description string }
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// 优先按全角 "："（UTF-8 3 字节）分割
+		idx := strings.Index(line, "：")
+		sepLen := len("：")
+		if idx < 0 {
+			// 回退到 ASCII ":"
+			idx = strings.Index(line, ":")
+			sepLen = 1
+		}
+		if idx > 0 {
+			entries = append(entries, struct{ Name, Description string }{
+				Name:        strings.TrimSpace(line[:idx]),
+				Description: strings.TrimSpace(line[idx+sepLen:]),
+			})
+		} else {
+			entries = append(entries, struct{ Name, Description string }{Name: line, Description: ""})
+		}
+	}
+	return entries
+}
+
+// generateAssetImage 调图像模型生成一张资产图，上传 OSS，返回公开 URL。
+func generateAssetImage(name, description, kind string) (string, error) {
+	gen, err := provider.Get("gpt-image-2")
+	if err != nil {
+		return "", fmt.Errorf("图像模型不可用: %v", err)
+	}
+	prompt := fmt.Sprintf("%s：%s。%s。高质量，细节丰富，电影级光影，4K", kind, name, description)
+	result, err := gen.GenerateImage(prompt, provider.ImageOptions{AspectRatio: "1:1", ImageSize: "1K"})
+	if err != nil {
+		return "", err
+	}
+	// UploadBase64Image(base64Data, licenseID, directory)
+	return storage.UploadBase64Image(result.Data, "novel-assets", "novel-assets")
 }
