@@ -38,20 +38,21 @@
 | ① 解析 analyze | ✅ 完成+验证 | glm-5.2 产出 大纲+人物画像+场景+情节列表（人物/场景数组已归一化） |
 | ② 情节下分镜 | ✅ 完成+验证 | `/plots/:id/storyboard`，每情节自适应 2~5 镜 |
 | ③ 前端章节详情 | ✅ 完成 | 解析按钮→大纲/人物/场景→情节列表→情节下分镜+镜头编辑 |
-| ④ 资产库 | ⏳ 待做 | 人物/场景图生成（小说级复用，喂给视频） |
+| ④ 资产库 | ✅ 完成 | 资产存 generations 表（novel_id 区分小说库/公共池）；分镜页生成人物/场景图；Assets 页加小说名/公共池筛选 |
+| Veo 3.1 视频 | ✅ API 适配 | relay_video.go 匹配新 API（/v1/videos/generations + /v1/tasks + veo3.1-720p/1080p）；卡中转站通道 |
 | 视频 B-3 | ⏳ 待做 | shots/资产 → 视频模型 → 拼接 |
 
 **数据表**：`novels`、`novel_chapters`(+outline/characters/scenes/analysis_status)、`novel_plots`(+storyboard_status)、`novel_shots`(plot_id)。
 
-**关键 bug 修复记录**（过程踩坑）：切章正则空行吞标题、dev_code 死代码、keygen 未加载 JWT_SECRET、OSS 阻止公共访问、chat 静默失败、novel_plots 无 updated_at、shots 唯一键 chapter_id→plot_id、解析 characters/scenes 数组类型、**GBK/GB18030 自动转码**（大小说非 UTF-8 上传）、**空正文章节过滤**（卷首"第X卷"标题误切为空章节）。
+**关键 bug 修复记录**（过程踩坑）：切章正则空行吞标题、dev_code 死代码、keygen 未加载 JWT_SECRET、OSS 阻止公共访问、chat 静默失败、novel_plots 无 updated_at、shots 唯一键 chapter_id→plot_id、解析 characters/scenes 数组类型、**GBK/GB18030 自动转码**（大小说非 UTF-8 上传）、**空正文章节过滤**（卷首"第X卷"标题误切为空章节）、**useMessage() 替代 window.$message**（toast 从不显示）、**章节状态 analysis_status vs storyboard_status 混淆**、**切换小说/章节缓存旧数据**（route watch + store reset）、**查询性能优化 Select**（排除 raw_content/content 大文本，10ms 级响应）、**goroutine panic 恢复 + 启动清理**（卡住状态兜底）、**gpt-image-2 超时 300s→180s**（单张 >3 分钟判失败）。
 
-> 注：上传限制 50MB；非 UTF-8(.txt) 自动按 GBK/GB18030 解码；空正文章节（卷首/分节标题）自动滤除并重排序号。
+> 注：上传限制 50MB；非 UTF-8(.txt) 自动按 GBK/GB18030 解码；空正文章节自动滤除；切换页面有 toast 反馈（解析/分镜/资产 开始+完成）；AssetPicker 从素材库选参考图。
 
 ## 四、待办（按优先级）
 
-1. **④ 资产库**：novel_characters/novel_scenes 表 + 生图接口（角色/场景图，小说级复用）+ 分镜页"生成人物/场景图"按钮。
-2. **视频 B-3**：图→视频模型→拼接（需先解决 Veo 通道或用 sora-2/Seedance）。
-3. 章节切分：楔子/序章保留（首标记前内容当序章）、正文"第X章"误切启发式。
+1. **视频 B-3**：图→视频模型→拼接（需先解决 Veo 通道或用 sora-2/Seedance）。
+2. 章节切分：楔子/序章保留（首标记前内容当序章）、正文"第X章"误切启发式。
+3. Veo 通道：中转站 svip 组开通 veo3.1-720p/1080p 渠道（代码已适配新 API）。
 4. （可选）整理 dev-guide 文档同步新模块。
 
 ## 五、运行/测试速查
