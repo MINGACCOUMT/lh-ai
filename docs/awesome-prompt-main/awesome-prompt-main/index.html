@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Compressed MeiGen prompt gallery" />
+    <title>Awesome Prompt Gallery</title>
+    <link rel="stylesheet" href="./assets/gallery.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>AWESOME PROMPT</h1>
+        </div>
+        <div class="stats" aria-label="Archive stats">
+          <span><strong id="promptCount">...</strong> prompts</span>
+          <span><strong id="imageCount">...</strong> images</span>
+        </div>
+      </header>
+
+      <section class="controls" aria-label="Filters">
+        <label>
+          <span>Search</span>
+          <input id="searchInput" placeholder="prompt, author, model, id" />
+        </label>
+        <label>
+          <span>Model</span>
+          <select id="modelSelect">
+            <option value="all">All models</option>
+          </select>
+        </label>
+        <label>
+          <span>Type</span>
+          <select id="typeSelect">
+            <option value="all">All</option>
+            <option value="images">Images</option>
+            <option value="videos">Video covers</option>
+          </select>
+        </label>
+      </section>
+
+      <p class="result-line"><strong id="matchCount">0</strong> matching images</p>
+      <section id="gallery" class="gallery" aria-label="Prompt images"></section>
+      <div class="load-more"><button id="loadMore" type="button">Load more</button></div>
+    </main>
+
+    <dialog id="viewer">
+      <button id="closeViewer" class="close" type="button" aria-label="Close">x</button>
+      <img id="viewerImage" alt="" />
+      <aside>
+        <p id="viewerModel"></p>
+        <h2 id="viewerTitle"></h2>
+        <pre id="viewerPrompt"></pre>
+        <div class="viewer-actions">
+          <button id="copyPrompt" type="button">Copy prompt</button>
+          <a id="sourceLink" href="#" target="_blank" rel="noreferrer">Source</a>
+        </div>
+      </aside>
+    </dialog>
+
+    <script src="./assets/gallery.js" type="module"></script>
+  </body>
+</html>

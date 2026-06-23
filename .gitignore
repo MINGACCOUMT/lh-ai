@@ -55,3 +55,5 @@ frontend/public/images/qrcode.jpg
 
 # Sample data with external resource dependencies
 backend/cmd/import_inspiration_full_json/prompts_full.json
+docs/awesome-prompt-main/*.zip
+docs/awesome-prompt-main/awesome-prompt-main/node_modules/

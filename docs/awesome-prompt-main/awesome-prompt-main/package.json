@@ -1,0 +1,13 @@
+{
+  "name": "awesome-prompt",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:meigen": "node scripts/build-meigen-archive.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}
