@@ -101,6 +101,7 @@ const navItems = computed(() => [
   { name: 'inspiration', path: '/inspiration', icon: 'inspiration', label: t('nav.inspiration') },
   { name: 'generate', path: '/generate', icon: 'generate', label: t('nav.generate') },
   { name: 'assets', path: '/assets', icon: 'assets', label: t('nav.assets') },
+  { name: 'prompt-library', path: '/prompts', icon: 'assets', label: t('nav.prompts') },
   { name: 'novel-list', path: '/novel', icon: 'assets', label: t('nav.novel') },
   { name: 'tools', path: '/tools', icon: 'tools', label: t('nav.tools') }
 ])

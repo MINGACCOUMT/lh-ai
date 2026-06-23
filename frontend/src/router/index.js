@@ -19,6 +19,7 @@ const ImageConvert = () => import('../views/ImageConvert.vue')
 const NovelList = () => import('../views/NovelList.vue')
 const NovelDetail = () => import('../views/NovelDetail.vue')
 const ChapterStoryboard = () => import('../views/ChapterStoryboard.vue')
+const PromptLibrary = () => import('../views/PromptLibrary.vue')
 
 const routes = [
   {
@@ -158,6 +159,15 @@ const routes = [
           titleKey: 'seo.imageConvert.title',
           descriptionKey: 'seo.imageConvert.description',
           keywordKey: 'seo.imageConvert.keywords'
+        }
+      },
+      {
+        path: 'prompts',
+        name: 'prompt-library',
+        component: PromptLibrary,
+        meta: {
+          titleKey: 'seo.prompts.title',
+          descriptionKey: 'seo.prompts.description'
         }
       },
       { path: 'novel', name: 'novel-list', component: NovelList, meta: { requiresAuth: true } },

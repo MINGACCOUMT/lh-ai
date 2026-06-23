@@ -223,7 +223,10 @@
                     <n-input v-model:value="s.characters" placeholder="人物" @update:value="scheduleSave(s)" />
                   </label>
                   <label class="shot-field">
-                    <span class="shot-field-label">图片提示词</span>
+                    <span class="shot-field-label">
+                      图片提示词
+                      <button type="button" class="inspire-trigger" @click.prevent="openInspireModal">{{ t('prompts.inspireButton') }}</button>
+                    </span>
                     <n-input v-model:value="s.prompt" type="textarea" :autosize="{ minRows: 2 }" placeholder="图片提示词" @update:value="scheduleSave(s)" />
                   </label>
                   <label class="shot-field">
@@ -249,6 +252,56 @@
         </div>
       </n-spin>
     </div>
+
+    <!-- Prompt library inspiration modal -->
+    <NModal
+      v-model:show="showInspireModal"
+      preset="card"
+      :title="t('prompts.inspireTitle')"
+      :style="{ width: 'min(820px, calc(100vw - 32px))' }"
+      :mask-closable="true"
+      :bordered="false"
+    >
+      <div class="inspire-wrap">
+        <div class="inspire-search">
+          <svg class="inspire-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            v-model="inspireKeyword"
+            type="text"
+            class="inspire-search-input"
+            :placeholder="t('prompts.inspireModalPlaceholder')"
+            @input="onInspireSearch"
+          />
+        </div>
+        <div class="inspire-scroll" @scroll="onInspireScroll">
+          <div v-if="inspireLoading && !inspireItems.length" class="inspire-state">
+            <NSpin size="small" />
+          </div>
+          <div v-else-if="inspireItems.length" class="inspire-grid">
+            <button
+              v-for="item in inspireItems"
+              :key="item.id"
+              type="button"
+              class="inspire-card"
+              @click="pickInspirePrompt(item)"
+            >
+              <img :src="item.image" class="inspire-thumb" loading="lazy" :alt="item.title" />
+              <div class="inspire-meta">
+                <div class="inspire-title">{{ item.title }}</div>
+                <div class="inspire-prompt">{{ item.prompt }}</div>
+              </div>
+            </button>
+          </div>
+          <div v-else class="inspire-state">
+            <NEmpty size="small" :description="t('prompts.empty')" />
+          </div>
+          <div v-if="inspireLoading && inspireItems.length" class="inspire-loading-more">{{ t('prompts.loading') }}</div>
+        </div>
+      </div>
+    </NModal>
   </div>
 </template>
 
@@ -256,19 +309,89 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NEmpty, NSpin, NInput, useMessage } from 'naive-ui'
+import { NEmpty, NSpin, NInput, NModal, useMessage } from 'naive-ui'
 import { useNovelStore } from '../stores/novel'
+import { usePrompts } from '../composables/usePrompts'
 
 const { t } = useI18n()
 const message = useMessage()
 const route = useRoute()
 const router = useRouter()
 const store = useNovelStore()
+const { listPrompts } = usePrompts()
 
 const loading = ref(false)
 const activePool = ref('novel') // 'novel' | 'public'
 let pollTimer = null
 const saveTimers = new Map()
+
+// ===== Prompt library inspiration modal =====
+const showInspireModal = ref(false)
+const inspireKeyword = ref('')
+const inspireItems = ref([])
+const inspireTotal = ref(0)
+const inspireLoading = ref(false)
+let inspireTimer = null
+
+const fetchInspire = async (reset = false) => {
+  if (inspireLoading.value) return
+  inspireLoading.value = true
+  try {
+    const params = { limit: 24, offset: reset ? 0 : inspireItems.value.length }
+    const kw = inspireKeyword.value.trim()
+    if (kw) params.q = kw
+    const { data } = await listPrompts(params)
+    const list = data.items || []
+    inspireTotal.value = data.total || 0
+    if (reset) inspireItems.value = list
+    else inspireItems.value.push(...list)
+  } catch (e) {
+    message.error(e.response?.data?.error || t('prompts.loadFailed'))
+    if (reset) inspireItems.value = []
+  } finally {
+    inspireLoading.value = false
+  }
+}
+
+const onInspireSearch = () => {
+  if (inspireTimer) clearTimeout(inspireTimer)
+  inspireTimer = setTimeout(() => fetchInspire(true), 300)
+}
+
+const openInspireModal = () => {
+  showInspireModal.value = true
+  inspireKeyword.value = ''
+  fetchInspire(true)
+}
+
+const closeInspireModal = () => {
+  showInspireModal.value = false
+}
+
+const pickInspirePrompt = async (item) => {
+  const text = item.prompt || ''
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    message.success(t('prompts.inspireCopied'))
+  } catch {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    document.body.appendChild(ta)
+    ta.select()
+    try { document.execCommand('copy'); message.success(t('prompts.inspireCopied')) }
+    catch { message.error(t('prompts.copyFailed')) }
+    document.body.removeChild(ta)
+  }
+  closeInspireModal()
+}
+
+const onInspireScroll = (e) => {
+  const el = e.target
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) {
+    if (inspireItems.value.length < inspireTotal.value) fetchInspire(false)
+  }
+}
 
 const chapter = computed(() => store.chapterDetail?.chapter || null)
 const plots = computed(() => store.chapterDetail?.plots || [])
@@ -1016,5 +1139,134 @@ function storyboardStatusText(s) {
   .plot-header {
     flex-wrap: wrap;
   }
+}
+
+/* ===== Prompt inspire button + modal ===== */
+.inspire-trigger {
+  margin-left: 8px;
+  padding: 1px 8px;
+  height: 20px;
+  border: 1px solid rgba(0, 202, 224, 0.35);
+  background: rgba(0, 202, 224, 0.12);
+  color: #8cefff;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .2s;
+}
+.inspire-trigger:hover {
+  background: rgba(0, 202, 224, 0.24);
+  border-color: rgba(0, 202, 224, 0.55);
+}
+
+.inspire-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspire-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.inspire-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.inspire-search-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 14px 0 34px;
+  background: var(--color-tint-white-02);
+  border: 1px solid var(--color-tint-white-08);
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: all .2s;
+}
+.inspire-search-input::placeholder { color: var(--color-text-muted); }
+.inspire-search-input:focus {
+  border-color: rgba(0, 202, 224, 0.45);
+}
+
+.inspire-scroll {
+  max-height: 56vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.inspire-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.inspire-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-tint-white-02);
+  border: 1px solid var(--color-tint-white-06);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  transition: all .2s;
+  font-family: inherit;
+}
+.inspire-card:hover {
+  border-color: rgba(0, 202, 224, 0.45);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px var(--color-tint-black-30);
+}
+
+.inspire-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--color-tint-white-04);
+}
+
+.inspire-meta {
+  padding: 6px 8px 8px;
+}
+.inspire-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.inspire-prompt {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.inspire-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 0;
+}
+
+.inspire-loading-more {
+  text-align: center;
+  padding: 12px;
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 </style>
