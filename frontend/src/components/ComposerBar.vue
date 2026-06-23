@@ -40,6 +40,8 @@ const optimizeRequestId = ref(0)  // 用于防重复请求
 // --- AssetPicker (works library) ---
 const showAssetPicker = ref(false)
 const showAddImagePopover = ref(false)
+// null = reference images (multi mode); 'first' / 'last' = video frame (single mode)
+const framePickerTarget = ref(null)
 const triggerFileUpload = () => {
   showAddImagePopover.value = false
   nextTick(() => {
@@ -49,9 +51,40 @@ const triggerFileUpload = () => {
 }
 const openAssetPicker = () => {
   showAddImagePopover.value = false
+  framePickerTarget.value = null
+  showAssetPicker.value = true
+}
+const showFramePopover = ref(false)
+const showLastFramePopover = ref(false)
+const triggerFrameFileUpload = (type) => {
+  if (type === 'first') showFramePopover.value = false
+  else showLastFramePopover.value = false
+  nextTick(() => {
+    const el = document.querySelector(`.frame-file-input[data-frame="${type}"]`)
+    if (el) el.click()
+  })
+}
+const openFrameAssetPicker = (type) => {
+  if (type === 'first') showFramePopover.value = false
+  else showLastFramePopover.value = false
+  framePickerTarget.value = type
   showAssetPicker.value = true
 }
 const onAssetPickerConfirm = (urls) => {
+  // 单帧模式: AssetPicker 在 single 模式下 emit 的是单个 URL 字符串
+  if (framePickerTarget.value === 'first') {
+    const url = Array.isArray(urls) ? urls[0] : urls
+    if (url) { firstFramePreview.value = url; firstFrameUrl.value = url }
+    framePickerTarget.value = null
+    return
+  }
+  if (framePickerTarget.value === 'last') {
+    const url = Array.isArray(urls) ? urls[0] : urls
+    if (url) { lastFramePreview.value = url; lastFrameUrl.value = url }
+    framePickerTarget.value = null
+    return
+  }
+  // 参考图模式 (multi)
   const list = Array.isArray(urls) ? urls : [urls]
   for (const url of list) {
     if (!url) continue
@@ -678,16 +711,35 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
 
         <!-- Video mode: always show first + last frame uploads -->
         <div v-if="creativeMode === 'video'" class="composer-uploads">
+          <input type="file" accept="image/*" class="frame-file-input" data-frame="first"
+            @change="handleFrameUpload('first', $event)" hidden />
+          <input type="file" accept="image/*" class="frame-file-input" data-frame="last"
+            @change="handleFrameUpload('last', $event)" hidden />
           <div class="upload-card" :style="{ '--tilt': '-5deg' }">
             <template v-if="firstFramePreview">
               <img :src="firstFramePreview" />
               <button class="card-remove" @click="removeFrame('first')">×</button>
             </template>
-            <label v-else class="frame-placeholder">
-              <input type="file" accept="image/*" @change="handleFrameUpload('first', $event)" hidden />
-              <span class="add-icon">+</span>
-              <span class="frame-lbl">{{ $t('composer.firstFrame') }}</span>
-            </label>
+            <NPopover v-else trigger="click" placement="bottom" :show-arrow="false" raw
+              content-class="add-image-popover"
+              v-model:show="showFramePopover">
+              <template #trigger>
+                <div class="frame-placeholder" :title="$t('composer.firstFrame')">
+                  <span class="add-icon">+</span>
+                  <span class="frame-lbl">{{ $t('composer.firstFrame') }}</span>
+                </div>
+              </template>
+              <div class="add-image-menu">
+                <button class="add-image-item" type="button" @click="triggerFrameFileUpload('first')">
+                  <span class="add-image-icon">📁</span>
+                  <span>上传文件</span>
+                </button>
+                <button class="add-image-item" type="button" @click="openFrameAssetPicker('first')">
+                  <span class="add-image-icon">🖼</span>
+                  <span>从素材库选择</span>
+                </button>
+              </div>
+            </NPopover>
           </div>
           <span class="frame-sep">→</span>
           <div class="upload-card" :style="{ '--tilt': '5deg' }">
@@ -695,11 +747,26 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
               <img :src="lastFramePreview" />
               <button class="card-remove" @click="removeFrame('last')">×</button>
             </template>
-            <label v-else class="frame-placeholder">
-              <input type="file" accept="image/*" @change="handleFrameUpload('last', $event)" hidden />
-              <span class="add-icon">+</span>
-              <span class="frame-lbl">{{ $t('composer.lastFrame') }}</span>
-            </label>
+            <NPopover v-else trigger="click" placement="bottom" :show-arrow="false" raw
+              content-class="add-image-popover"
+              v-model:show="showLastFramePopover">
+              <template #trigger>
+                <div class="frame-placeholder" :title="$t('composer.lastFrame')">
+                  <span class="add-icon">+</span>
+                  <span class="frame-lbl">{{ $t('composer.lastFrame') }}</span>
+                </div>
+              </template>
+              <div class="add-image-menu">
+                <button class="add-image-item" type="button" @click="triggerFrameFileUpload('last')">
+                  <span class="add-image-icon">📁</span>
+                  <span>上传文件</span>
+                </button>
+                <button class="add-image-item" type="button" @click="openFrameAssetPicker('last')">
+                  <span class="add-image-icon">🖼</span>
+                  <span>从素材库选择</span>
+                </button>
+              </div>
+            </NPopover>
           </div>
         </div>
 
@@ -921,11 +988,11 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
       </div>
     </div>
 
-    <!-- 从素材库选择参考图 -->
+    <!-- 从素材库选择参考图 / 首尾帧 -->
     <AssetPicker
       v-model:show="showAssetPicker"
-      mode="multi"
-      :exclude-urls="uploadedImageUrls"
+      :mode="framePickerTarget ? 'single' : 'multi'"
+      :exclude-urls="framePickerTarget ? [] : uploadedImageUrls"
       @confirm="onAssetPickerConfirm"
     />
   </div>
