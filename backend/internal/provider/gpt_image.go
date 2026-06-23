@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"google-ai-proxy/internal/storage"
 	"time"
 )
 
@@ -49,16 +51,45 @@ func (g *GPTImageModel) GenerateImage(prompt string, opts ImageOptions) (*ImageR
 		fullPrompt = fmt.Sprintf("%s\n\n(aspect ratio: %s)", prompt, ar)
 	}
 
-	reqBody := gptImageRequest{
-		Model:  model,
-		Prompt: fullPrompt,
-		N:      1,
-	}
-	jsonData, _ := json.Marshal(reqBody)
-
-	apiURL := baseURL + "/v1/images/generations"
 	client := &http.Client{Timeout: 180 * time.Second} // 单张超 3 分钟判失败
-	log.Printf("[GPTImage] 调用: %s model=%s", apiURL, model)
+
+	// 有参考图 → /v1/images/edits（图生图/编辑）；无参考图 → /v1/images/generations（文生图）
+	var apiURL string
+	var jsonData []byte
+
+	if len(opts.InputImages) > 0 {
+		// 图生图：上传参考图到 OSS → 拿 URL → 调 /v1/images/edits
+		apiURL = baseURL + "/v1/images/edits"
+		imgURL, err := storage.UploadBase64Image(opts.InputImages[0], "gpt-edit", "gpt-edit")
+		if err != nil {
+			return nil, fmt.Errorf("上传参考图失败: %v", err)
+		}
+		editBody := map[string]interface{}{
+			"model":  model,
+			"prompt": fullPrompt,
+			"image":  imgURL,
+			"n":      1,
+		}
+		// mask（局部重绘）
+		if opts.MaskImage != "" {
+			maskURL, err := storage.UploadBase64Image(opts.MaskImage, "gpt-edit", "gpt-edit")
+			if err == nil {
+				editBody["mask"] = maskURL
+			}
+		}
+		jsonData, _ = json.Marshal(editBody)
+		log.Printf("[GPTImage] 调用 edits: %s model=%s img=%s", apiURL, model, imgURL[:min(60, len(imgURL))])
+	} else {
+		// 文生图
+		apiURL = baseURL + "/v1/images/generations"
+		reqBody := gptImageRequest{
+			Model:  model,
+			Prompt: fullPrompt,
+			N:      1,
+		}
+		jsonData, _ = json.Marshal(reqBody)
+		log.Printf("[GPTImage] 调用: %s model=%s", apiURL, model)
+	}
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
