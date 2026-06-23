@@ -87,6 +87,9 @@ func main() {
 		apiGroup.GET("/pricing", api.GetPricing)
 		apiGroup.GET("/models", api.GetModels)
 
+		// Prompt Library (public)
+		apiGroup.GET("/prompts", api.ListPrompts)
+
 		// Auth
 		apiGroup.POST("/auth/send-code", api.SendVerificationCode)
 		apiGroup.POST("/auth/register", api.Register)
