@@ -61,7 +61,12 @@ async function loadImages() {
     const flat = []
     for (const g of items) {
       let urls = []
-      try { urls = JSON.parse(g.images || '[]') } catch { /* ignore */ }
+      let rawImgs = g.images
+      if (typeof rawImgs === 'string') {
+        try { urls = JSON.parse(rawImgs || '[]') } catch { /* ignore */ }
+      } else if (Array.isArray(rawImgs)) {
+        urls = rawImgs
+      }
       for (const url of urls) {
         if (!url || seen.has(url)) continue
         seen.add(url)

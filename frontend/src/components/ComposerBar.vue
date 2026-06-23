@@ -39,6 +39,18 @@ const optimizeRequestId = ref(0)  // 用于防重复请求
 
 // --- AssetPicker (works library) ---
 const showAssetPicker = ref(false)
+const showAddImagePopover = ref(false)
+const triggerFileUpload = () => {
+  showAddImagePopover.value = false
+  nextTick(() => {
+    const el = document.querySelector('.composer-uploads .upload-card-add input[type=file]')
+    if (el) el.click()
+  })
+}
+const openAssetPicker = () => {
+  showAddImagePopover.value = false
+  showAssetPicker.value = true
+}
 const onAssetPickerConfirm = (urls) => {
   const list = Array.isArray(urls) ? urls : [urls]
   for (const url of list) {
@@ -634,23 +646,31 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
             </div>
           </template>
           <!-- 添加按钮（空态 / 单张 / 展开态，且未满 3 张） -->
-          <label v-if="uploadedImageUrls.length < 3 && (uploadedImagePreviews.length <= 1 || uploadsExpanded)"
-            class="upload-card" :style="{ '--tilt': uploadedImagePreviews.length === 0 ? '-4deg' : '3deg' }">
-            <input type="file" accept="image/*" multiple @change="handleUpload" hidden />
-            <div class="frame-placeholder">
-              <span class="add-icon">+</span>
-              <span class="frame-lbl">{{ creativeMode === 'ecommerce' ? $t('composer.productImage') : $t('composer.refImage') }}</span>
+          <NPopover v-if="uploadedImageUrls.length < 3 && (uploadedImagePreviews.length <= 1 || uploadsExpanded)"
+            trigger="click" placement="bottom" :show-arrow="false" raw
+            content-class="add-image-popover"
+            v-model:show="showAddImagePopover">
+            <template #trigger>
+              <div class="upload-card upload-card-add" :style="{ '--tilt': uploadedImagePreviews.length === 0 ? '-4deg' : '3deg' }"
+                :title="creativeMode === 'ecommerce' ? $t('composer.productImage') : $t('composer.refImage')">
+                <input type="file" accept="image/*" multiple @change="handleUpload" hidden />
+                <div class="frame-placeholder">
+                  <span class="add-icon">+</span>
+                  <span class="frame-lbl">{{ creativeMode === 'ecommerce' ? $t('composer.productImage') : $t('composer.refImage') }}</span>
+                </div>
+              </div>
+            </template>
+            <div class="add-image-menu">
+              <button class="add-image-item" type="button" @click="triggerFileUpload">
+                <span class="add-image-icon">📁</span>
+                <span>上传文件</span>
+              </button>
+              <button class="add-image-item" type="button" @click="openAssetPicker">
+                <span class="add-image-icon">🖼</span>
+                <span>从素材库选择</span>
+              </button>
             </div>
-          </label>
-          <!-- 从素材库选择 -->
-          <button v-if="uploadedImageUrls.length < 3 && (uploadedImagePreviews.length <= 1 || uploadsExpanded)"
-            type="button" class="upload-card asset-pick-btn" :style="{ '--tilt': uploadedImagePreviews.length === 0 ? '3deg' : '-4deg' }"
-            @click="showAssetPicker = true" title="从素材库选择">
-            <div class="frame-placeholder">
-              <span class="add-icon">🖼</span>
-              <span class="frame-lbl">素材库</span>
-            </div>
-          </button>
+          </NPopover>
           <!-- 展开态收起按钮 -->
           <button v-if="uploadsExpanded && uploadedImagePreviews.length >= 2"
             class="stack-collapse-btn" @click="uploadsExpanded = false" title="收起">−</button>
@@ -1070,9 +1090,7 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
 .stack-collapse-btn:hover { background: var(--color-tint-white-10); color: var(--color-text-primary); }
 
 .add-icon { font-size: 22px; color: var(--color-text-muted); font-weight: 300; line-height: 1; }
-.asset-pick-btn {
-  padding: 0; border: none; background: transparent; cursor: pointer; font-family: inherit;
-}
+.upload-card-add { cursor: pointer; display: flex; align-items: stretch; justify-content: stretch; }
 .card-remove {
   position: absolute; top: -7px; right: -7px; z-index: 2;
   width: 20px; height: 20px; border-radius: 50%;
@@ -1089,6 +1107,26 @@ defineExpose({ fillPrompt, fillFromGeneration, fillEditImage })
 .frame-placeholder:hover { border-color: rgba(102,126,234,.4); }
 .frame-lbl { font-size: 11px; color: var(--color-text-muted); }
 .frame-sep { color: var(--color-text-muted); font-size: 16px; margin: 0 2px; flex-shrink: 0; }
+
+/* Add-image popover menu (raw popover — needs :deep) */
+.composer-card :deep(.add-image-popover) {
+  padding: 6px !important;
+  background: var(--color-card-solid);
+  border: 1px solid var(--color-tint-white-06);
+  border-radius: 12px;
+  box-shadow: 0 12px 48px var(--color-tint-black-50), 0 0 0 1px var(--color-tint-white-03);
+  min-width: 168px;
+}
+.add-image-menu { display: flex; flex-direction: column; gap: 2px; }
+.add-image-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 9px 12px;
+  background: transparent; border: none; border-radius: 8px;
+  color: var(--color-text-primary); font-size: 13px; font-family: inherit;
+  cursor: pointer; transition: background .15s; text-align: left;
+}
+.add-image-item:hover { background: var(--color-tint-white-06); }
+.add-image-icon { font-size: 15px; line-height: 1; }
 
 /* Toolbar */
 .composer-toolbar {
