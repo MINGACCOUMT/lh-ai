@@ -50,10 +50,22 @@
 
 ## 四、待办（按优先级）
 
-1. **视频 B-3**：图→视频模型→拼接（需先解决 Veo 通道或用 sora-2/Seedance）。
+1. **视频 B-3**：图→视频模型→拼接（Veo 3.1 新 API 通道已通，上游偶尔过载；ffmpeg 已安装）。
 2. 章节切分：楔子/序章保留（首标记前内容当序章）、正文"第X章"误切启发式。
-3. Veo 通道：中转站 svip 组开通 veo3.1-720p/1080p 渠道（代码已适配新 API）。
-4. （可选）整理 dev-guide 文档同步新模块。
+3. （可选）整理 dev-guide 文档同步新模块。
+
+## 五、今日新增功能（2026-06-23）
+
+- **提示词灵感库**：`GET /api/prompts`（分页+搜索 prompts-all.json）；前端 `/prompts` 页面（瀑布流+搜索+复制提示词+分享到广场）；分镜编辑页"💡灵感"按钮（从灵感库选提示词复制到剪贴板）。
+- **AssetPicker 增强**：参考图/首帧/尾帧均可从素材库选（弹出选择：上传 vs 素材库）；修复 images 字段解析（API 返回数组不再 JSON.parse 报错）。
+- **gpt-image-2 参考图修复**：有参考图时调 `/v1/images/edits`（之前忽略 InputImages，只调 `/v1/images/generations`），参考图传 OSS URL。
+- **章节列表状态修复**：徽章用 `analysis_status`（未解析/解析中/已解析/失败），不再用 `storyboard_status`；chLite 返回 analysis_status + assets_status。
+- **切换缓存修复**：store openNovel/openChapter 开头清空旧数据 + route watch 监听参数变化重载。
+- **toast 反馈**：useMessage() 替代 window.$message（之前全失效）；解析/分镜/资产 开始+完成都有提示。
+- **查询性能优化**：Select 排除 raw_content/content（10ms 级响应，之前因拉大文本 blob 慢）。
+- **兜底机制**：4 个 goroutine 加 defer recover；后端启动清理卡住状态（analyzing/generating/extracting → failed）。
+- **gpt-image-2 超时** 300s→180s（单张 >3 分钟判失败）。
+- **Veo 3.1 新 API 适配**：relay_video.go 匹配 `/v1/videos/generations` + `/v1/tasks` + `veo3.1-720p/1080p`。
 
 ## 五、运行/测试速查
 
