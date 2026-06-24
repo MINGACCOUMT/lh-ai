@@ -20,6 +20,7 @@ const NovelList = () => import('../views/NovelList.vue')
 const NovelDetail = () => import('../views/NovelDetail.vue')
 const ChapterStoryboard = () => import('../views/ChapterStoryboard.vue')
 const PromptLibrary = () => import('../views/PromptLibrary.vue')
+const Canvas = () => import('../views/Canvas.vue')
 
 const routes = [
   {
@@ -172,7 +173,19 @@ const routes = [
       },
       { path: 'novel', name: 'novel-list', component: NovelList, meta: { requiresAuth: true } },
       { path: 'novel/:id', name: 'novel-detail', component: NovelDetail, meta: { requiresAuth: true } },
-      { path: 'novel/chapter/:cid', name: 'chapter-storyboard', component: ChapterStoryboard, meta: { requiresAuth: true } }
+      { path: 'novel/chapter/:cid', name: 'chapter-storyboard', component: ChapterStoryboard, meta: { requiresAuth: true } },
+      {
+        path: 'canvas',
+        name: 'canvas',
+        component: Canvas,
+        meta: { titleKey: 'seo.canvas.title', requiresAuth: true }
+      },
+      {
+        path: 'canvas/:projectId',
+        name: 'canvas-project',
+        component: Canvas,
+        meta: { titleKey: 'seo.canvas.title', requiresAuth: true }
+      }
     ]
   },
   {
