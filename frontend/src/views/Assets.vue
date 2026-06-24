@@ -2,11 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { NEmpty, NPopover, useMessage } from 'naive-ui'
+import { NEmpty, NPopover, NModal, NInput, NSelect, NRadioGroup, NRadioButton, NButton, useMessage } from 'naive-ui'
 import { useGenerationStore } from '../stores/generation'
 import { useNovelStore } from '../stores/novel'
 import { useUserStore } from '../stores/user'
 import { useInspiration } from '../composables/useInspiration'
+import { useGenerate } from '../composables/useGenerate'
 import ShareGenerationDialog from '../components/ShareGenerationDialog.vue'
 
 const { t } = useI18n()
@@ -15,6 +16,7 @@ const genStore = useGenerationStore()
 const novelStore = useNovelStore()
 const userStore = useUserStore()
 const { shareGeneration, unshareInspiration, listLikedInspirations, listMyInspirations, unlikeInspiration, publishInspiration } = useInspiration()
+const { generate, pollTask } = useGenerate()
 const message = useMessage()
 
 const typeFilter = ref('all')
@@ -35,6 +37,126 @@ const sharedLimit = 20
 
 const canLoadMoreLiked = computed(() => likedPosts.value.length < likedTotal.value)
 const canLoadMoreShared = computed(() => sharedPosts.value.length < sharedTotal.value)
+
+// ====== 多选 + 生成视频 ======
+const MAX_VIDEO_IMAGES = 3
+const multiSelectMode = ref(false)
+const selectedIds = ref([])         // 选中的 generation id
+const selectedUrls = ref([])        // 选中的图片 URL（与 id 一一对应）
+
+// 视频生成弹窗
+const showVideoDialog = ref(false)
+const videoGenerating = ref(false)
+const videoPrompt = ref('')
+const videoModel = ref('veo-3.1-generate-preview')
+const videoDuration = ref(8)
+const modelOptions = [
+  { label: 'Veo 3.1', value: 'veo-3.1-generate-preview' },
+  { label: 'Seedance', value: 'seedance-1-pro' }
+]
+
+// 从一条 generation 提取第一张图片 URL（兼容数组 / JSON 字符串）
+const extractFirstImageUrl = (gen) => {
+  if (!gen) return ''
+  let imgs = gen.images
+  if (typeof imgs === 'string') {
+    try { imgs = JSON.parse(imgs || '[]') } catch { imgs = [] }
+  }
+  return Array.isArray(imgs) ? (imgs[0] || '') : ''
+}
+
+// 当前主列表（用于“全选”计算）。仅生成物列表支持多选（非 liked/shared）
+const selectableGenerations = computed(() => {
+  if (subFilter.value === 'liked' || subFilter.value === 'shared') return []
+  return genStore.generations.filter(g => extractFirstImageUrl(g))
+})
+const allSelected = computed(() =>
+  selectableGenerations.value.length > 0 &&
+  selectableGenerations.value.every(g => selectedIds.value.includes(g.id))
+)
+
+const enterMultiSelect = () => {
+  multiSelectMode.value = true
+}
+const exitMultiSelect = () => {
+  multiSelectMode.value = false
+  selectedIds.value = []
+  selectedUrls.value = []
+}
+
+const toggleSelect = (gen) => {
+  const url = extractFirstImageUrl(gen)
+  if (!url) return
+  const idx = selectedIds.value.indexOf(gen.id)
+  if (idx >= 0) {
+    selectedIds.value.splice(idx, 1)
+    selectedUrls.value.splice(idx, 1)
+    return
+  }
+  if (selectedIds.value.length >= MAX_VIDEO_IMAGES) {
+    message.warning(`最多只能选择 ${MAX_VIDEO_IMAGES} 张图片`)
+    return
+  }
+  selectedIds.value.push(gen.id)
+  selectedUrls.value.push(url)
+}
+
+const isSelected = (id) => selectedIds.value.includes(id)
+
+const toggleSelectAll = () => {
+  if (allSelected.value) {
+    selectedIds.value = []
+    selectedUrls.value = []
+    return
+  }
+  const list = selectableGenerations.value.slice(0, MAX_VIDEO_IMAGES)
+  selectedIds.value = list.map(g => g.id)
+  selectedUrls.value = list.map(g => extractFirstImageUrl(g))
+}
+
+const openVideoDialog = () => {
+  if (!selectedUrls.value.length) return
+  if (!userStore.requireAuth()) return
+  videoPrompt.value = ''
+  videoDuration.value = 8
+  videoModel.value = 'veo-3.1-generate-preview'
+  showVideoDialog.value = true
+}
+
+const submitVideoGenerate = async () => {
+  if (!selectedUrls.value.length) return
+  videoGenerating.value = true
+  try {
+    const payload = {
+      type: 'video',
+      model: videoModel.value,
+      prompt: videoPrompt.value || '',
+      images: [...selectedUrls.value],
+      params: {
+        mode: 'text-to-video',
+        resolution: '720p',
+        ratio: '16:9',
+        duration: videoDuration.value,
+        generate_audio: true
+      }
+    }
+    const { task_id } = await generate('video', payload)
+    showVideoDialog.value = false
+    exitMultiSelect()
+    message.success('视频生成中...')
+    // 轮询完成后重载列表，让结果出现在网格里
+    pollTask(task_id, (update) => {
+      if (update.status === 'success' || update.status === 'failed') {
+        genStore.load(true, true)
+      }
+    })
+  } catch (e) {
+    const msg = e.response?.data?.error || e.response?.data?.detail || e.message || '视频生成请求失败'
+    message.error(typeof msg === 'string' ? msg : '视频生成请求失败')
+  } finally {
+    videoGenerating.value = false
+  }
+}
 const isCurrentLoading = computed(() => {
   if (subFilter.value === 'liked') return likedLoading.value || likedLoadingMore.value
   if (subFilter.value === 'shared') return sharedLoading.value || sharedLoadingMore.value
@@ -414,6 +536,16 @@ const handleScroll = (e) => {
         <button :class="['filter-chip', { active: subFilter === 'favorite' }]" @click="setSubFilter('favorite')">{{ $t('assets.favorites') }}</button>
         <button :class="['filter-chip', { active: subFilter === 'shared' }]" @click="setSubFilter('shared')">{{ $t('assets.myShares') }}</button>
         <button :class="['filter-chip', { active: subFilter === 'liked' }]" @click="setSubFilter('liked')">{{ $t('assets.myLikes') }}</button>
+        <button
+          v-if="subFilter !== 'liked' && subFilter !== 'shared'"
+          :class="['multi-select-btn', { active: multiSelectMode }]"
+          @click="multiSelectMode ? exitMultiSelect() : enterMultiSelect()"
+        >{{ multiSelectMode ? '✓ 多选中' : '多选' }}</button>
+        <button
+          v-if="multiSelectMode"
+          class="multi-select-btn"
+          @click="toggleSelectAll"
+        >{{ allSelected ? '取消全选' : '全选' }}</button>
         <button v-if="subFilter === 'shared'" class="publish-btn" @click="openPublishDialog">{{ t('inspiration.publishAction') }}</button>
       </div>
       <div class="filter-row novel-row">
@@ -442,9 +574,17 @@ const handleScroll = (e) => {
               <img v-else :src="item.cover_url || item.images?.[0]" class="asset-thumb" loading="lazy" />
             </div>
             <!-- Image asset -->
-            <div v-else-if="item.images?.length" class="asset-preview" @click="viewInGenerate(item)">
+            <div
+              v-else-if="item.images?.length"
+              class="asset-preview"
+              :class="{ selectable: multiSelectMode, selected: isSelected(item.id) }"
+              @click="multiSelectMode ? toggleSelect(item) : viewInGenerate(item)"
+            >
               <img :src="item.images[0]" class="asset-thumb" loading="lazy" />
               <div v-if="item.images.length > 1" class="asset-count">+{{ item.images.length - 1 }}</div>
+              <div v-if="multiSelectMode" class="select-checkbox" :class="{ checked: isSelected(item.id) }">
+                <svg v-if="isSelected(item.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M5 12l5 5L20 7" /></svg>
+              </div>
             </div>
             <!-- Video asset -->
             <div v-else-if="item.video_url" class="asset-preview" @click="viewInGenerate(item)">
@@ -615,6 +755,61 @@ const handleScroll = (e) => {
       mode="upload"
       @confirm="handlePublishConfirm"
     />
+
+    <!-- 多选浮动操作栏 -->
+    <Transition name="bar-slide">
+      <div v-if="multiSelectMode && selectedIds.length" class="selection-bar">
+        <span class="selection-count">已选 {{ selectedIds.length }}/{{ MAX_VIDEO_IMAGES }} 张</span>
+        <button class="selection-action primary" :disabled="!selectedIds.length" @click="openVideoDialog">
+          🎬 生成视频
+        </button>
+        <button class="selection-action" @click="exitMultiSelect">取消</button>
+      </div>
+    </Transition>
+
+    <!-- 视频生成弹窗 -->
+    <NModal
+      v-model:show="showVideoDialog"
+      preset="card"
+      :title="'用选中图片生成视频'"
+      style="width: 560px; max-width: 92vw;"
+      :bordered="false"
+      :mask-closable="!videoGenerating"
+    >
+      <div class="video-gen-dialog">
+        <div class="video-gen-thumbs">
+          <img v-for="(url, i) in selectedUrls" :key="i" :src="url" class="video-gen-thumb" />
+        </div>
+        <div class="video-gen-field">
+          <label class="video-gen-label">提示词</label>
+          <NInput
+            v-model:value="videoPrompt"
+            type="textarea"
+            :rows="3"
+            placeholder="描述你想生成的视频效果（可选）"
+            :disabled="videoGenerating"
+          />
+        </div>
+        <div class="video-gen-field">
+          <label class="video-gen-label">模型</label>
+          <NSelect v-model:value="videoModel" :options="modelOptions" :disabled="videoGenerating" />
+        </div>
+        <div class="video-gen-field">
+          <label class="video-gen-label">时长（秒）</label>
+          <NRadioGroup v-model:value="videoDuration" :disabled="videoGenerating">
+            <NRadioButton :value="4">4s</NRadioButton>
+            <NRadioButton :value="6">6s</NRadioButton>
+            <NRadioButton :value="8">8s</NRadioButton>
+          </NRadioGroup>
+        </div>
+      </div>
+      <template #footer>
+        <div class="video-gen-footer">
+          <NButton @click="showVideoDialog = false" :disabled="videoGenerating">取消</NButton>
+          <NButton type="primary" :loading="videoGenerating" @click="submitVideoGenerate">生成</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
 
@@ -716,6 +911,151 @@ const handleScroll = (e) => {
 .publish-btn:hover {
   background: rgba(0, 202, 224, 0.28);
   box-shadow: 0 2px 10px rgba(0, 202, 224, 0.2);
+}
+
+.multi-select-btn {
+  margin-left: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-tint-white-12);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+.multi-select-btn:hover {
+  border-color: rgba(0, 202, 224, 0.45);
+  color: #d8fbff;
+}
+.multi-select-btn.active {
+  border-color: rgba(0, 202, 224, 0.55);
+  background: rgba(0, 202, 224, 0.18);
+  color: #8cefff;
+}
+
+.asset-preview.selectable {
+  cursor: pointer;
+}
+.asset-preview.selected .asset-thumb {
+  opacity: 0.7;
+}
+.asset-preview.selected {
+  box-shadow: inset 0 0 0 3px rgba(0, 202, 224, 0.9);
+}
+
+.select-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: all .15s;
+}
+.select-checkbox.checked {
+  border-color: #00cae0;
+  background: #00cae0;
+  color: #062330;
+}
+
+.selection-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(18, 22, 30, 0.92);
+  border: 1px solid rgba(0, 202, 224, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  z-index: 50;
+}
+.selection-count {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 6px;
+}
+.selection-action {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid var(--color-tint-white-15);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+.selection-action:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+.selection-action.primary {
+  border-color: rgba(0, 202, 224, 0.55);
+  background: rgba(0, 202, 224, 0.25);
+  color: #d8fbff;
+}
+.selection-action.primary:hover {
+  background: rgba(0, 202, 224, 0.4);
+}
+.selection-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.bar-slide-enter-active, .bar-slide-leave-active {
+  transition: all .25s ease;
+}
+.bar-slide-enter-from, .bar-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 16px);
+}
+
+.video-gen-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.video-gen-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.video-gen-thumb {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--color-tint-white-12);
+}
+.video-gen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.video-gen-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.video-gen-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .assets-scroll {
