@@ -208,6 +208,7 @@ func (r *RelayVideoProvider) createVideoTaskVeo(req VideoGenerateRequest) (*Vide
 	referenceMode := "frame"
 	if len(imageUrls) >= 3 {
 		referenceMode = "image"
+		duration = 8 // image 模式仅支持 8 秒
 	}
 
 	body := map[string]interface{}{
