@@ -275,6 +275,17 @@ type InspirationReviewLog struct {
 	CreatedAt      time.Time `gorm:"type:datetime;index;comment:Created at" json:"created_at"`
 }
 
+// CanvasProject 画布项目（layout 存 Vue Flow 序列化的 JSON）
+type CanvasProject struct {
+	ID        uint64    `gorm:"primaryKey" json:"id"`
+	UserID    uint64    `gorm:"type:bigint;index;not null" json:"user_id"`
+	Name      string    `gorm:"type:varchar(200);default:'未命名画布'" json:"name"`
+	Layout    string    `gorm:"type:longtext" json:"layout"`
+	Status    string    `gorm:"type:varchar(20);default:'active'" json:"status"`
+	CreatedAt time.Time `gorm:"type:datetime" json:"created_at"`
+	UpdatedAt time.Time `gorm:"type:datetime" json:"updated_at"`
+}
+
 // InitDB initializes the MySQL database connection.
 func InitDB() {
 	dbHost := os.Getenv("DB_HOST")

@@ -176,6 +176,17 @@ func main() {
 			novelGroup.GET("/:id/assets", api.GetAssets)
 		}
 
+		// Canvas
+		canvasGroup := apiGroup.Group("/canvas")
+		canvasGroup.Use(api.UserAuthMiddleware())
+		{
+			canvasGroup.GET("", api.ListCanvasProjects)
+			canvasGroup.POST("", api.CreateCanvasProject)
+			canvasGroup.GET("/:id", api.GetCanvasProject)
+			canvasGroup.PUT("/:id", api.UpdateCanvasProject)
+			canvasGroup.DELETE("/:id", api.DeleteCanvasProject)
+		}
+
 		// Admin moderation
 		adminGroup := apiGroup.Group("/admin")
 		adminGroup.Use(adminapi.AuthMiddleware())
