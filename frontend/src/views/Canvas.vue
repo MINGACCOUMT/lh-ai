@@ -1,7 +1,7 @@
 <script setup>
-import { ref, markRaw, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, markRaw, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
+import { useMessage, NSelect } from 'naive-ui'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -11,14 +11,34 @@ import '@vue-flow/core/dist/theme-default.css'
 
 import ImageNode from '../components/canvas/ImageNode.vue'
 import TextNode from '../components/canvas/TextNode.vue'
+import AssetPicker from '../components/AssetPicker.vue'
 import { useCanvasStore } from '../stores/canvas'
 import { useUserStore } from '../stores/user'
+import { useModelsStore } from '../stores/models'
+import { useGenerate } from '../composables/useGenerate'
 
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const store = useCanvasStore()
 const userStore = useUserStore()
+const modelsStore = useModelsStore()
+const { generate, pollTask } = useGenerate()
+
+// ---- Image generation panel ----
+const showGenPanel = ref(true) // generation panel visible by default
+const prompt = ref('')
+const selectedModel = ref('')
+const generating = ref(false)
+const showRefPicker = ref(false)
+const refImageUrls = ref([]) // reference images for generation
+
+const modelOptions = computed(() => {
+  return (modelsStore.imageModels || []).map(m => ({
+    label: m.name || m.id,
+    value: m.id
+  }))
+})
 
 // ---- Vue Flow state + programmatic API ----
 const nodes = ref([])
@@ -214,6 +234,74 @@ const ensureProject = async () => {
 const sidebarCollapsed = ref(false)
 const toggleSidebar = () => { sidebarCollapsed.value = !sidebarCollapsed.value }
 
+// ---- Image generation ----
+// pollTask in useGenerate is callback-based and resolves with no value, so we
+// wrap it to obtain a promise that resolves with the final update.
+const pollForResult = (taskId) =>
+  new Promise((resolve, reject) => {
+    pollTask(taskId, (update) => {
+      if (update.status === 'success' || update.status === 'failed') {
+        resolve(update)
+      }
+    })
+  })
+
+const onGenerate = async () => {
+  if (!prompt.value.trim() || !selectedModel.value) {
+    message.warning('请输入提示词并选择模型')
+    return
+  }
+  if (!userStore.requireAuth()) return
+  if (!(await ensureProject())) return
+
+  generating.value = true
+  message.info('正在生成图片...')
+
+  try {
+    const payload = {
+      type: 'image',
+      prompt: prompt.value,
+      model: selectedModel.value,
+      params: { aspectRatio: '1:1', imageSize: '1K' }
+    }
+    if (refImageUrls.value.length > 0) {
+      payload.images = refImageUrls.value
+    }
+
+    const { task_id } = await generate('image', payload)
+    const result = await pollForResult(task_id)
+
+    if (result.status === 'success' && result.images?.length) {
+      // Add the generated image as a new node on the canvas, offset below the
+      // viewport center so it doesn't land directly on top of existing nodes.
+      const pos = centerPosition()
+      pos.y += 50
+      addNodes([{
+        id: genId('gen'),
+        type: 'image',
+        position: pos,
+        data: {
+          imageUrl: result.images[0],
+          label: '生成结果',
+          prompt: prompt.value,
+          model: selectedModel.value
+        }
+      }])
+      message.success('图片已生成并添加到画布')
+      prompt.value = '' // clear input
+    } else {
+      message.error('生成失败: ' + (result.error_msg || '未知错误'))
+    }
+
+    // Refresh user credits after a successful spend.
+    userStore.fetchUserInfo()
+  } catch (e) {
+    message.error(e.response?.data?.error || e.message || '生成失败')
+  } finally {
+    generating.value = false
+  }
+}
+
 // ---- Lifecycle ----
 onMounted(async () => {
   if (!userStore.requireAuth()) return
@@ -222,6 +310,12 @@ onMounted(async () => {
   } catch (e) {
     // Non-fatal: sidebar just shows empty.
   }
+  // Load image models for the generation panel; default-select the first one.
+  modelsStore.loadModels().then(() => {
+    if (modelOptions.value.length && !selectedModel.value) {
+      selectedModel.value = modelOptions.value[0].value
+    }
+  })
   const pid = route.params.projectId
   if (pid) await openProject(pid)
 })
@@ -278,6 +372,7 @@ onBeforeUnmount(() => {
       <div class="canvas-toolbar">
         <button class="tool-btn" @click="addImageNode">🖼 添加图片</button>
         <button class="tool-btn" @click="addTextNode">📝 添加文字</button>
+        <button class="tool-btn" :class="{ active: showGenPanel }" @click="showGenPanel = !showGenPanel">🎨 生图</button>
         <button class="tool-btn primary" :disabled="saving || !currentProjectId" @click="() => save(false)">
           <span v-if="saving">保存中…</span>
           <span v-else>💾 保存</span>
@@ -287,6 +382,29 @@ onBeforeUnmount(() => {
           {{ store.currentProject.name }}
         </div>
       </div>
+
+      <!-- Generation Panel -->
+      <div v-if="showGenPanel && currentProjectId" class="gen-panel">
+        <textarea v-model="prompt" class="gen-input" placeholder="输入提示词生成图片..." rows="2"></textarea>
+        <div class="gen-controls">
+          <n-select v-model:value="selectedModel" :options="modelOptions" size="small" style="width: 160px" placeholder="选择模型" />
+          <button class="gen-ref-btn" @click="showRefPicker = true" title="参考图">
+            📎 {{ refImageUrls.length }}
+          </button>
+          <button class="gen-btn" :disabled="!prompt.trim() || generating" @click="onGenerate">
+            {{ generating ? '生成中…' : '🎨 生成' }}
+          </button>
+        </div>
+        <!-- Reference thumbnails -->
+        <div v-if="refImageUrls.length" class="ref-thumbs">
+          <div v-for="(url, i) in refImageUrls" :key="i" class="ref-thumb">
+            <img :src="url" />
+            <button class="ref-remove" @click="refImageUrls.splice(i, 1)">×</button>
+          </div>
+        </div>
+      </div>
+      <AssetPicker v-model:show="showRefPicker" mode="multi" :exclude-urls="refImageUrls"
+        @confirm="(urls) => { refImageUrls.push(...urls.filter(u => !refImageUrls.includes(u))); refImageUrls.splice(3) }" />
 
       <VueFlow
         v-model:nodes="nodes"
@@ -498,6 +616,89 @@ onBeforeUnmount(() => {
 .tool-btn.primary:hover:not(:disabled) {
   background: #33d5e7;
   border-color: #33d5e7;
+}
+.tool-btn.active {
+  background: rgba(0, 202, 224, 0.15);
+  border-color: #00cae0;
+  color: #00cae0;
+}
+
+/* ===== Generation panel ===== */
+.gen-panel {
+  position: absolute;
+  top: 56px; /* below toolbar */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(460px, 90%);
+  background: rgba(20, 25, 35, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 202, 224, 0.2);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.gen-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #e6eaf0;
+  padding: 8px 12px;
+  font-size: 14px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+}
+.gen-input:focus { border-color: #00cae0; }
+.gen-controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+}
+.gen-ref-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #9aa3b2;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.gen-btn {
+  background: #00cae0;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.gen-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ref-thumbs {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.ref-thumb {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ref-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ref-remove {
+  position: absolute; top: 2px; right: 2px;
+  background: rgba(0,0,0,0.6); color: #fff;
+  border: none; border-radius: 50%; width: 16px; height: 16px;
+  font-size: 10px; cursor: pointer; line-height: 1;
 }
 .toolbar-spacer {
   flex: 1;
